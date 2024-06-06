@@ -27,10 +27,15 @@ export default function SubscriptionPendingDialog({
   onClose,
   authenticatedUser,
 }: Props) {
-  const hasPlan =
-    !!authenticatedUser &&
-    !!authenticatedUser.subscription &&
-    !!authenticatedUser.subscription.planId;
+  const userPlanIdAtOpening = React.useRef<?string>(
+    !!authenticatedUser.subscription
+      ? authenticatedUser.subscription.planId
+      : null
+  );
+  const userPlanId = !!authenticatedUser.subscription
+    ? authenticatedUser.subscription.planId
+    : null;
+  const hasUserPlanChanged = userPlanId !== userPlanIdAtOpening.current;
   const canUserBenefitFromDiscordRole =
     !!authenticatedUser &&
     canBenefitFromDiscordRole(authenticatedUser.subscription);
@@ -41,7 +46,7 @@ export default function SubscriptionPendingDialog({
         // Ignore any error, will be retried anyway.
       });
     },
-    hasPlan ? null : 3900
+    hasUserPlanChanged ? null : 3900
   );
   const currentDiscordUsername =
     !!authenticatedUser && !!authenticatedUser.profile
@@ -62,8 +67,7 @@ export default function SubscriptionPendingDialog({
           {
             discordUsername,
           },
-          preferences,
-          { throwError: false }
+          preferences
         );
       } catch (error) {
         console.error('Error while editing profile:', error);
@@ -92,7 +96,7 @@ export default function SubscriptionPendingDialog({
         <Dialog
           title={<Trans>Confirming your subscription</Trans>}
           actions={[
-            hasPlan ? (
+            hasUserPlanChanged ? (
               <LeftLoader isLoading={isLoading} key="close">
                 <DialogPrimaryButton
                   label={<Trans>Done!</Trans>}
@@ -115,7 +119,7 @@ export default function SubscriptionPendingDialog({
           maxWidth="sm"
           open
         >
-          {!hasPlan ? (
+          {!hasUserPlanChanged ? (
             <Column noMargin>
               <Line expand alignItems="center" justifyContent="center">
                 <Text>

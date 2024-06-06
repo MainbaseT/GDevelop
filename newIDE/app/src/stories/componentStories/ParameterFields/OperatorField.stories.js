@@ -2,7 +2,6 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 
-import muiDecorator from '../../ThemeDecorator';
 import paperDecorator from '../../PaperDecorator';
 
 import { testProject } from '../../GDevelopJsInitializerDecorator';
@@ -15,7 +14,7 @@ const gd: libGDevelop = global.gd;
 export default {
   title: 'ParameterFields/OperatorField',
   component: OperatorField,
-  decorators: [paperDecorator, muiDecorator],
+  decorators: [paperDecorator],
 };
 
 export const OperatorFieldString = () => (
@@ -28,6 +27,9 @@ export const OperatorFieldString = () => (
         onChange={onChange}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         parameterMetadata={
           testProject.stringRelationalOperatorParameterMetadata
         }
@@ -45,6 +47,9 @@ export const OperatorFieldNumber = () => (
         onChange={onChange}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         parameterMetadata={
           testProject.numberRelationalOperatorParameterMetadata
         }
@@ -62,6 +67,9 @@ export const OperatorFieldColor = () => (
         onChange={onChange}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         parameterMetadata={testProject.colorRelationalOperatorParameterMetadata}
       />
     )}
@@ -77,6 +85,9 @@ export const OperatorFieldUnknownType = () => (
         onChange={onChange}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         parameterMetadata={
           testProject.unknownRelationalOperatorParameterMetadata
         }

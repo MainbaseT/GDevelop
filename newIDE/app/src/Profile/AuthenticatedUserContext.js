@@ -12,8 +12,9 @@ import {
 import { type PreferencesValues } from '../MainFrame/Preferences/PreferencesContext';
 import { type CloudProjectWithUserAccessInfo } from '../Utils/GDevelopServices/Project';
 import { User as FirebaseUser } from 'firebase/auth';
-import { type Badge } from '../Utils/GDevelopServices/Badge';
+import { type Badge, type Achievement } from '../Utils/GDevelopServices/Badge';
 import { type Recommendation } from '../Utils/GDevelopServices/User';
+import { type Notification } from '../Utils/GDevelopServices/Notification';
 import {
   type Limits,
   type Usages,
@@ -41,6 +42,7 @@ export type AuthenticatedUser = {|
   gameTemplatePurchases: ?Array<Purchase>,
   assetPackPurchases: ?Array<Purchase>,
   recommendations: ?Array<Recommendation>,
+  notifications: ?Array<Notification>,
   limits: ?Limits,
   authenticationError: ?AuthError,
   usages: ?Usages,
@@ -55,8 +57,7 @@ export type AuthenticatedUser = {|
   ) => Promise<void>,
   onEditProfile: (
     payload: PatchUserPayload,
-    preferences: PreferencesValues,
-    options: {| throwError: boolean |}
+    preferences: PreferencesValues
   ) => Promise<void>,
   onResetPassword: ForgotPasswordForm => Promise<void>,
   onOpenLoginDialog: () => void,
@@ -71,6 +72,7 @@ export type AuthenticatedUser = {|
   onRefreshLimits: () => Promise<void>,
   onRefreshGameTemplatePurchases: () => Promise<void>,
   onRefreshAssetPackPurchases: () => Promise<void>,
+  onRefreshNotifications: () => Promise<void>,
   onPurchaseSuccessful: () => Promise<void>,
   onSendEmailVerification: () => Promise<void>,
   onOpenEmailVerificationDialog: ({|
@@ -79,6 +81,7 @@ export type AuthenticatedUser = {|
   |}) => void,
   onAcceptGameStatsEmail: (value: boolean) => Promise<void>,
   getAuthorizationHeader: () => Promise<string>,
+  achievements: ?Array<Achievement>,
 |};
 
 export const initialAuthenticatedUser = {
@@ -96,6 +99,7 @@ export const initialAuthenticatedUser = {
   gameTemplatePurchases: null,
   assetPackPurchases: null,
   recommendations: null,
+  notifications: null,
   subscription: null,
   usages: null,
   limits: null,
@@ -119,11 +123,13 @@ export const initialAuthenticatedUser = {
   onRefreshLimits: async () => {},
   onRefreshGameTemplatePurchases: async () => {},
   onRefreshAssetPackPurchases: async () => {},
+  onRefreshNotifications: async () => {},
   onPurchaseSuccessful: async () => {},
   onSendEmailVerification: async () => {},
   onOpenEmailVerificationDialog: () => {},
   onAcceptGameStatsEmail: async () => {},
   getAuthorizationHeader: () => Promise.reject(new Error('Unimplemented')),
+  achievements: null,
 };
 
 export const authenticatedUserLoggedOutAttributes = {

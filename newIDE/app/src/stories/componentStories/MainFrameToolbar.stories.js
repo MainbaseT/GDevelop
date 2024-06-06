@@ -1,7 +1,6 @@
 // @flow
 import * as React from 'react';
 
-import muiDecorator from '../ThemeDecorator';
 import paperDecorator from '../PaperDecorator';
 
 import MainFrameToolbar, {
@@ -14,7 +13,7 @@ import DebugIcon from '../../UI/CustomSvgIcons/Debug';
 export default {
   title: 'MainFrameToolbar',
   component: MainFrameToolbar,
-  decorators: [paperDecorator, muiDecorator],
+  decorators: [paperDecorator],
 };
 
 const fakeEditorToolbar = (
@@ -53,6 +52,7 @@ const defaultProps: MainFrameToolbarProps = {
   onOpenDebugger: () => {},
   onNetworkPreview: () => {},
   onHotReloadPreview: () => {},
+  onLaunchPreviewWithDiagnosticReport: () => {},
   setPreviewOverride: () => {},
   canDoNetworkPreview: true,
   isPreviewEnabled: false,

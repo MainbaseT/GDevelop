@@ -17,9 +17,13 @@ import Preferences from '../../../UI/CustomSvgIcons/Preferences';
 import GDevelopGLogo from '../../../UI/CustomSvgIcons/GDevelopGLogo';
 import GDevelopThemeContext from '../../../UI/Theme/GDevelopThemeContext';
 import HomePageMenuBar from './HomePageMenuBar';
-import type { Profile } from '../../../Utils/GDevelopServices/Authentication';
+import {
+  canUseClassroomFeature,
+  type Limits,
+} from '../../../Utils/GDevelopServices/Usage';
 import AuthenticatedUserContext from '../../../Profile/AuthenticatedUserContext';
 import GraphsIcon from '../../../UI/CustomSvgIcons/Graphs';
+import { isNativeMobileApp } from '../../../Utils/Platform';
 
 export const styles = {
   drawerContent: {
@@ -129,16 +133,24 @@ const homePageMenuTabs: { [tab: string]: HomePageMenuTab } = {
 };
 
 export const getTabsToDisplay = ({
-  profile,
+  limits,
 }: {|
-  profile: ?Profile,
+  limits: ?Limits,
 |}): HomePageMenuTab[] => {
-  const displayTeamViewTab = profile && profile.isTeacher;
-  const displayPlayTab = !profile || !profile.isStudent;
+  const displayPlayTab =
+    !limits ||
+    !(
+      limits.capabilities.classrooms &&
+      limits.capabilities.classrooms.hidePlayTab
+    );
   const tabs = [
     'get-started',
     'build',
-    displayTeamViewTab ? 'team-view' : null,
+    canUseClassroomFeature(limits)
+      ? 'team-view'
+      : isNativeMobileApp()
+      ? null
+      : 'team-view',
     'manage',
     'shop',
     'learn',
@@ -162,13 +174,13 @@ export const HomePageMenu = ({
   onOpenAbout,
 }: Props) => {
   const gdevelopTheme = React.useContext(GDevelopThemeContext);
-  const { profile } = React.useContext(AuthenticatedUserContext);
+  const { limits } = React.useContext(AuthenticatedUserContext);
   const [
     isHomePageMenuDrawerOpen,
     setIsHomePageMenuDrawerOpen,
   ] = React.useState(false);
 
-  const tabsToDisplay = getTabsToDisplay({ profile });
+  const tabsToDisplay = getTabsToDisplay({ limits });
 
   const buttons: {
     label: React.Node,

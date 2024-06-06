@@ -20,6 +20,7 @@ type Props = {|
   onOpenPrivateGameTemplateListingData: (
     privateGameTemplateListingData: PrivateGameTemplateListingData
   ) => void,
+  onOpenProfile: () => void,
 |};
 
 const StoreSection = ({
@@ -27,6 +28,7 @@ const StoreSection = ({
   resourceManagementProps,
   canInstallPrivateAsset,
   onOpenPrivateGameTemplateListingData,
+  onOpenProfile,
 }: Props) => {
   const [
     isAssetPackDialogInstallOpen,
@@ -83,6 +85,8 @@ const StoreSection = ({
         onOpenPrivateGameTemplateListingData={
           onOpenPrivateGameTemplateListingData
         }
+        displayPromotions
+        onOpenProfile={onOpenProfile}
       />
       {(openedAssetPack || openedAssetShortHeader) && (
         <Line justifyContent="flex-end">

@@ -86,19 +86,19 @@ const styles = {
 const questionnaireFinishedImageSource = 'res/questionnaire/welcome-back.svg';
 
 type Props = {|
-  showUserChip: boolean => void,
   onUserSurveyStarted: () => void,
   onUserSurveyHidden: () => void,
   selectInAppTutorial: (tutorialId: string) => void,
   subscriptionPlansWithPricingSystems: ?(SubscriptionPlanWithPricingSystems[]),
+  onOpenProfile: () => void,
 |};
 
 const GetStartedSection = ({
-  showUserChip,
   selectInAppTutorial,
   onUserSurveyStarted,
   onUserSurveyHidden,
   subscriptionPlansWithPricingSystems,
+  onOpenProfile,
 }: Props) => {
   const isFillingOutSurvey = hasStartedUserSurvey();
   const isOnline = useOnlineStatus();
@@ -134,13 +134,7 @@ const GetStartedSection = ({
     | 'survey'
     | 'surveyFinished'
     | 'recommendations'
-  >(
-    profile && profile.survey
-      ? 'recommendations'
-      : isFillingOutSurvey
-      ? 'survey'
-      : 'welcome'
-  );
+  >(isFillingOutSurvey ? 'survey' : 'recommendations');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [username, setUsername] = React.useState('');
@@ -188,9 +182,9 @@ const GetStartedSection = ({
     try {
       setStep('surveyFinished');
       // Artificial delay to build up expectations.
-      recommendationsGettingDelayPromise.current = delay(5000);
+      recommendationsGettingDelayPromise.current = delay(2500);
       await Promise.all([
-        onEditProfile({ survey }, preferences, { throwError: true }),
+        onEditProfile({ survey }, preferences),
         recommendationsGettingDelayPromise.current,
       ]);
       sendUserSurveyCompleted();
@@ -215,22 +209,6 @@ const GetStartedSection = ({
       }
     },
     [onLoginWithProvider]
-  );
-
-  React.useEffect(
-    () => {
-      if (step === 'welcome' && profile && profile.survey) {
-        setStep('recommendations');
-      } else if ((step === 'login' || step === 'register') && profile) {
-        setStep(profile.survey ? 'recommendations' : 'survey');
-      } else if (!(step === 'login' || step === 'register') && !profile) {
-        setStep('welcome');
-      }
-      // Only show user chip when the user is logged in and can see the recommendations.
-      // In any other case, we don't want to distract them from completing the survey.
-      showUserChip(step === 'recommendations' && !!profile && !!profile.survey);
-    },
-    [profile, step, showUserChip]
   );
 
   // Logic to store the last visited authentication step.
@@ -635,16 +613,11 @@ const GetStartedSection = ({
 
   const renderSubtitle = () => (
     <ResponsiveLineStackLayout
-      justifyContent="space-between"
+      justifyContent="flex-end"
       alignItems="center"
       noColumnMargin
       noMargin
     >
-      <Text noMargin>
-        <Trans>
-          Here’s some content to get you started on your GDevelop journey!
-        </Trans>
-      </Text>
       <Checkbox
         label={<Trans>Don't show this screen on next startup</Trans>}
         checked={!preferences.showGetStartedSectionByDefault}
@@ -653,20 +626,14 @@ const GetStartedSection = ({
     </ResponsiveLineStackLayout>
   );
 
-  if (step === 'recommendations' && profile) {
+  if (step === 'recommendations') {
     return (
       <>
         <SectionContainer
-          title={
-            profile.username ? (
-              <Trans>Hello {profile.username}!</Trans>
-            ) : (
-              <Trans>Hello!</Trans>
-            )
-          }
+          title={<Trans>Start making games</Trans>}
           renderSubtitle={renderSubtitle}
           flexBody
-          showAnnouncementsAndPromotions
+          showUrgentAnnouncements
         >
           <RecommendationList
             authenticatedUser={authenticatedUser}
@@ -674,6 +641,15 @@ const GetStartedSection = ({
             subscriptionPlansWithPricingSystems={
               subscriptionPlansWithPricingSystems
             }
+            onOpenProfile={onOpenProfile}
+            onStartSurvey={
+              profile
+                ? () => {
+                    setStep('survey');
+                  }
+                : null
+            }
+            hasFilledSurveyAlready={profile ? !!profile.survey : false}
           />
         </SectionContainer>
       </>

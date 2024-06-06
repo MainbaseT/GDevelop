@@ -2,7 +2,6 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 
-import muiDecorator from '../../ThemeDecorator';
 import paperDecorator from '../../PaperDecorator';
 
 import { testProject } from '../../GDevelopJsInitializerDecorator';
@@ -14,7 +13,7 @@ const gd: libGDevelop = global.gd;
 export default {
   title: 'ParameterFields/ObjectField',
   component: ObjectField,
-  decorators: [paperDecorator, muiDecorator],
+  decorators: [paperDecorator],
 };
 
 export const Default = () => (
@@ -26,6 +25,9 @@ export const Default = () => (
         scope={{ project: testProject.project, layout: testProject.testLayout }}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         value={value}
         onChange={onChange}
       />
@@ -42,6 +44,9 @@ export const NonExistingObject = () => (
         scope={{ project: testProject.project, layout: testProject.testLayout }}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         value={value}
         onChange={onChange}
       />
@@ -74,6 +79,9 @@ export const WrongObjectType = () => {
           }}
           globalObjectsContainer={testProject.project}
           objectsContainer={testProject.testLayout}
+          projectScopedContainersAccessor={
+            testProject.testSceneProjectScopedContainersAccessor
+          }
           instructionMetadata={instructionMetadata}
           parameterMetadata={parameterMetadata}
           parameterIndex={0}
@@ -104,6 +112,9 @@ export const WithRequiredBehavior = () => {
           }}
           globalObjectsContainer={testProject.project}
           objectsContainer={testProject.testLayout}
+          projectScopedContainersAccessor={
+            testProject.testSceneProjectScopedContainersAccessor
+          }
           instructionMetadata={instructionMetadata}
           parameterIndex={0}
           value={value}

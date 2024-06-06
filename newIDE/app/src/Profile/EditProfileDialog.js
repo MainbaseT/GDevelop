@@ -4,12 +4,16 @@ import { Trans, t } from '@lingui/macro';
 import * as React from 'react';
 import { I18n } from '@lingui/react';
 import { type I18n as I18nType } from '@lingui/core';
+import { type MessageDescriptor } from '../Utils/i18n/MessageDescriptor.flow';
 import FlatButton from '../UI/FlatButton';
 import Dialog, { DialogPrimaryButton } from '../UI/Dialog';
 import {
   type EditForm,
   type AuthError,
   type Profile,
+  type UpdateGitHubStarResponse,
+  type UpdateTiktokFollowResponse,
+  type UpdateTwitterFollowResponse,
 } from '../Utils/GDevelopServices/Authentication';
 import {
   communityLinksConfig,
@@ -17,13 +21,19 @@ import {
   discordUsernameConfig,
   type UsernameAvailability,
   type CommunityLinkType,
+  type CommunityLinks,
 } from '../Utils/GDevelopServices/User';
+import { type Badge, type Achievement } from '../Utils/GDevelopServices/Badge';
 import {
   hasValidSubscriptionPlan,
   type Subscription,
 } from '../Utils/GDevelopServices/Usage';
 import LeftLoader from '../UI/LeftLoader';
-import { ColumnStackLayout, LineStackLayout } from '../UI/Layout';
+import {
+  ColumnStackLayout,
+  LineStackLayout,
+  TextFieldWithButtonLayout,
+} from '../UI/Layout';
 import {
   isUsernameValid,
   UsernameField,
@@ -36,12 +46,27 @@ import Text from '../UI/Text';
 import TextButton from '../UI/TextButton';
 import useAlertDialog from '../UI/Alert/useAlertDialog';
 import Form from '../UI/Form';
+import RaisedButton from '../UI/RaisedButton';
+import Coin from '../Credits/Icons/Coin';
+import { sendSocialFollowUpdated } from '../Utils/Analytics/EventSender';
+import { Line } from '../UI/Grid';
 
-type Props = {|
+export type EditProfileDialogProps = {|
   profile: Profile,
+  achievements: ?Array<Achievement>,
+  badges: ?Array<Badge>,
   subscription: ?Subscription,
   onClose: () => void,
   onEdit: (form: EditForm) => Promise<void>,
+  onUpdateGitHubStar: (
+    githubUsername: string
+  ) => Promise<UpdateGitHubStarResponse>,
+  onUpdateTiktokFollow: (
+    communityLinks: CommunityLinks
+  ) => Promise<UpdateTiktokFollowResponse>,
+  onUpdateTwitterFollow: (
+    communityLinks: CommunityLinks
+  ) => Promise<UpdateTwitterFollowResponse>,
   onDelete: () => Promise<void>,
   actionInProgress: boolean,
   error: ?AuthError,
@@ -55,6 +80,125 @@ export const getUsernameErrorText = (error: ?AuthError) => {
   if (error.code === 'auth/malformed-username')
     return usernameFormatErrorMessage;
   return undefined;
+};
+
+const CommunityLinkWithFollow = <UpdateResponse: { +code: string }>({
+  badges,
+  achievements,
+  achievementId,
+  value,
+  onChange,
+  onUpdateFollow,
+  getMessageFromUpdate,
+  disabled,
+  maxLength,
+  prefix,
+  getRewardMessage,
+  translatableHintText,
+  icon,
+}: {
+  badges: ?Array<Badge>,
+  achievements: ?Array<Achievement>,
+  achievementId: string,
+  value: string,
+  onChange: (value: string) => void,
+  onUpdateFollow: () => Promise<UpdateResponse>,
+  getMessageFromUpdate: (
+    responseCode: string
+  ) => null | {|
+    title: MessageDescriptor,
+    message: MessageDescriptor,
+  |},
+  getRewardMessage: (
+    hasBadge: boolean,
+    rewardValueInCredits: string
+  ) => MessageDescriptor,
+  disabled: boolean,
+  maxLength: number,
+  prefix: string,
+  translatableHintText?: string,
+  icon: React.Node,
+}) => {
+  const { showAlert } = useAlertDialog();
+
+  const hasBadge =
+    !!badges && badges.some(badge => badge.achievementId === achievementId);
+  const achievement =
+    (achievements &&
+      achievements.find(achievement => achievement.id === achievementId)) ||
+    null;
+
+  const onClaim = React.useCallback(
+    async () => {
+      try {
+        const response = await onUpdateFollow();
+        sendSocialFollowUpdated(achievementId, { code: response.code });
+
+        const messageAndTitle = getMessageFromUpdate(response.code);
+        if (messageAndTitle) {
+          showAlert({ ...messageAndTitle });
+        } else {
+          throw new Error(
+            `Error while updating the social follow: ${response.code}.`
+          );
+        }
+      } catch (error) {
+        console.error('Error while updating social follow:', error);
+        showAlert({
+          title: t`Something went wrong`,
+          message: t`Make sure you have a proper internet connection or try again later.`,
+        });
+      }
+    },
+    [onUpdateFollow, achievementId, getMessageFromUpdate, showAlert]
+  );
+
+  return (
+    <I18n>
+      {({ i18n }) => (
+        <LineStackLayout noMargin alignItems="flex-start">
+          <Line>{icon}</Line>
+          <TextFieldWithButtonLayout
+            renderButton={style => (
+              <RaisedButton
+                onClick={onClaim}
+                icon={<Coin fontSize="small" />}
+                label={
+                  hasBadge ? <Trans>Credits given</Trans> : <Trans>Claim</Trans>
+                }
+                disabled={hasBadge || disabled}
+                primary
+                style={style}
+              />
+            )}
+            renderTextField={() => (
+              <TextField
+                value={value}
+                fullWidth
+                translatableHintText={translatableHintText}
+                onChange={(e, value) => {
+                  onChange(value);
+                }}
+                startAdornment={
+                  prefix ? <Text noMargin>{prefix}</Text> : undefined
+                }
+                disabled={disabled}
+                maxLength={maxLength}
+                helperMarkdownText={i18n._(
+                  getRewardMessage(
+                    hasBadge,
+                    achievement && achievement.rewardValueInCredits
+                      ? achievement.rewardValueInCredits.toString()
+                      : '-'
+                  )
+                )}
+              />
+            )}
+          />
+        </LineStackLayout>
+      )}
+    </I18n>
+  );
 };
 
 const CommunityLinkLine = ({
@@ -98,12 +242,17 @@ const CommunityLinkLine = ({
 const EditProfileDialog = ({
   profile,
   subscription,
+  achievements,
+  badges,
   onClose,
   onEdit,
+  onUpdateGitHubStar,
+  onUpdateTiktokFollow,
+  onUpdateTwitterFollow,
   onDelete,
   actionInProgress,
   error,
-}: Props) => {
+}: EditProfileDialogProps) => {
   const { showDeleteConfirmation, showAlert } = useAlertDialog();
 
   const communityLinks = profile.communityLinks || {};
@@ -114,6 +263,9 @@ const EditProfileDialog = ({
   const [donateLink, setDonateLink] = React.useState(profile.donateLink || '');
   const [discordUsername, setDiscordUsername] = React.useState(
     profile.discordUsername || ''
+  );
+  const [githubUsername, setGithubUsername] = React.useState(
+    profile.githubUsername || ''
   );
   const [personalWebsiteLink, setPersonalWebsiteLink] = React.useState(
     communityLinks.personalWebsiteLink || ''
@@ -188,6 +340,19 @@ const EditProfileDialog = ({
     (!usernameAvailability || usernameAvailability.isAvailable) &&
     !hasFormattingError;
 
+  const updatedCommunityLinks = {
+    personalWebsiteLink,
+    personalWebsite2Link,
+    twitterUsername,
+    facebookUsername,
+    youtubeUsername,
+    tiktokUsername,
+    instagramUsername,
+    redditUsername,
+    snapchatUsername,
+    discordServerLink,
+  };
+
   const edit = async () => {
     if (!canEdit) return;
     await onEdit({
@@ -197,18 +362,8 @@ const EditProfileDialog = ({
       getNewsletterEmail,
       donateLink,
       discordUsername,
-      communityLinks: {
-        personalWebsiteLink,
-        personalWebsite2Link,
-        twitterUsername,
-        facebookUsername,
-        youtubeUsername,
-        tiktokUsername,
-        instagramUsername,
-        redditUsername,
-        snapchatUsername,
-        discordServerLink,
-      },
+      githubUsername,
+      communityLinks: updatedCommunityLinks,
     });
   };
 
@@ -269,7 +424,6 @@ const EditProfileDialog = ({
       label={<Trans>Delete my account</Trans>}
       disabled={actionInProgress}
       key="delete"
-      primary={false}
       onClick={onDeleteAccount}
     />,
   ];
@@ -301,6 +455,10 @@ const EditProfileDialog = ({
                 isValidatingUsername={isValidatingUsername}
                 disabled={actionInProgress}
               />
+
+              <Text size="sub-title" noMargin>
+                <Trans>Creator profile</Trans>
+              </Text>
               <TextField
                 value={discordUsername}
                 floatingLabelText={<Trans>Discord username</Trans>}
@@ -330,6 +488,70 @@ const EditProfileDialog = ({
                 floatingLabelFixed
                 maxLength={10000}
               />
+              <Text size="sub-title" noMargin>
+                <Trans>Socials</Trans>
+              </Text>
+              <CommunityLinkWithFollow
+                badges={badges}
+                achievements={achievements}
+                achievementId="github-star"
+                value={githubUsername}
+                onChange={setGithubUsername}
+                onUpdateFollow={() => onUpdateGitHubStar(githubUsername)}
+                getMessageFromUpdate={
+                  communityLinksConfig.githubUsername.getMessageFromUpdate
+                }
+                disabled={actionInProgress}
+                maxLength={communityLinksConfig.githubUsername.maxLength}
+                prefix={communityLinksConfig.githubUsername.prefix}
+                getRewardMessage={
+                  communityLinksConfig.githubUsername.getRewardMessage
+                }
+                translatableHintText={t`username`}
+                icon={communityLinksConfig.githubUsername.icon}
+              />
+              <CommunityLinkWithFollow
+                badges={badges}
+                achievements={achievements}
+                achievementId="twitter-follow"
+                value={twitterUsername}
+                onChange={setTwitterUsername}
+                onUpdateFollow={() =>
+                  onUpdateTwitterFollow(updatedCommunityLinks)
+                }
+                getMessageFromUpdate={
+                  communityLinksConfig.twitterUsername.getMessageFromUpdate
+                }
+                disabled={actionInProgress}
+                maxLength={communityLinksConfig.twitterUsername.maxLength}
+                prefix={communityLinksConfig.twitterUsername.prefix}
+                getRewardMessage={
+                  communityLinksConfig.twitterUsername.getRewardMessage
+                }
+                translatableHintText={t`username`}
+                icon={communityLinksConfig.twitterUsername.icon}
+              />
+              <CommunityLinkWithFollow
+                badges={badges}
+                achievements={achievements}
+                achievementId="tiktok-follow"
+                value={tiktokUsername}
+                onChange={setTiktokUsername}
+                onUpdateFollow={() =>
+                  onUpdateTiktokFollow(updatedCommunityLinks)
+                }
+                getMessageFromUpdate={
+                  communityLinksConfig.tiktokUsername.getMessageFromUpdate
+                }
+                disabled={actionInProgress}
+                maxLength={communityLinksConfig.tiktokUsername.maxLength}
+                prefix={communityLinksConfig.tiktokUsername.prefix}
+                getRewardMessage={
+                  communityLinksConfig.tiktokUsername.getRewardMessage
+                }
+                translatableHintText={t`username`}
+                icon={communityLinksConfig.tiktokUsername.icon}
+              />
               <CommunityLinkLine
                 id="personalWebsiteLink"
                 value={personalWebsiteLink}
@@ -349,15 +571,6 @@ const EditProfileDialog = ({
                 disabled={actionInProgress}
               />
               <CommunityLinkLine
-                id="twitterUsername"
-                value={twitterUsername}
-                translatableHintText={t`username`}
-                onChange={(e, value) => {
-                  setTwitterUsername(value);
-                }}
-                disabled={actionInProgress}
-              />
-              <CommunityLinkLine
                 id="facebookUsername"
                 value={facebookUsername}
                 translatableHintText={t`username`}
@@ -372,15 +585,6 @@ const EditProfileDialog = ({
                 translatableHintText={t`username`}
                 onChange={(e, value) => {
                   setYoutubeUsername(value);
-                }}
-                disabled={actionInProgress}
-              />
-              <CommunityLinkLine
-                id="tiktokUsername"
-                value={tiktokUsername}
-                translatableHintText={t`username`}
-                onChange={(e, value) => {
-                  setTiktokUsername(value);
                 }}
                 disabled={actionInProgress}
               />
@@ -436,6 +640,9 @@ const EditProfileDialog = ({
                 errorText={donateLinkError}
                 maxLength={donateLinkConfig.maxLength}
               />
+              <Text size="sub-title" noMargin>
+                <Trans>Notifications</Trans>
+              </Text>
               <Checkbox
                 label={<Trans>I want to receive the GDevelop Newsletter</Trans>}
                 checked={getNewsletterEmail}

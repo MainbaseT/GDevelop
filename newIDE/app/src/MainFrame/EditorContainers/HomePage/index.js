@@ -15,6 +15,7 @@ import PlaySection from './PlaySection';
 import ManageSection from './ManageSection';
 import CommunitySection from './CommunitySection';
 import StoreSection from './StoreSection';
+import { type TutorialCategory } from '../../../Utils/GDevelopServices/Tutorial';
 import { TutorialContext } from '../../../Tutorial/TutorialContext';
 import { ExampleStoreContext } from '../../../AssetStore/ExampleStore/ExampleStoreContext';
 import { HomePageHeader } from './HomePageHeader';
@@ -45,6 +46,9 @@ import Text from '../../../UI/Text';
 import Link from '../../../UI/Link';
 import Window from '../../../Utils/Window';
 import { getHelpLink } from '../../../Utils/HelpLink';
+import { canUseClassroomFeature } from '../../../Utils/GDevelopServices/Usage';
+import EducationMarketingSection from './EducationMarketingSection';
+import useEducationForm from './UseEducationForm';
 
 const gamesDashboardWikiArticle = getHelpLink('/interface/games-dashboard/');
 const isShopRequested = (routeArguments: RouteArguments): boolean =>
@@ -160,9 +164,13 @@ export const HomePage = React.memo<Props>(
       }: Props,
       ref
     ) => {
-      const { authenticated, onCloudProjectsChanged } = React.useContext(
-        AuthenticatedUserContext
-      );
+      const authenticatedUser = React.useContext(AuthenticatedUserContext);
+      const {
+        authenticated,
+        onCloudProjectsChanged,
+        onOpenLoginDialog,
+        limits,
+      } = authenticatedUser;
       const userSurveyStartedRef = React.useRef<boolean>(false);
       const userSurveyHiddenRef = React.useRef<boolean>(false);
       const { fetchTutorials } = React.useContext(TutorialContext);
@@ -171,7 +179,6 @@ export const HomePage = React.memo<Props>(
         fetchGameTemplates,
         shop: { setInitialGameTemplateUserFriendlySlug },
       } = React.useContext(PrivateGameTemplateStoreContext);
-      const [showUserChip, setShowUserChip] = React.useState<boolean>(false);
       const [openedGame, setOpenedGame] = React.useState<?Game>(null);
       const [
         gameDetailsCurrentTab,
@@ -180,7 +187,14 @@ export const HomePage = React.memo<Props>(
       const { routeArguments, removeRouteArguments } = React.useContext(
         RouterContext
       );
-
+      const {
+        educationForm,
+        onChangeEducationForm,
+        onSendEducationForm,
+        educationFormError,
+        educationFormStatus,
+        onResetEducationForm,
+      } = useEducationForm({ authenticatedUser });
       const { isMobile } = useResponsiveWindowSize();
       const {
         values: { showGetStartedSectionByDefault },
@@ -200,6 +214,10 @@ export const HomePage = React.memo<Props>(
         : 'build';
 
       const [activeTab, setActiveTab] = React.useState<HomeTab>(initialTab);
+      const [
+        learnInitialCategory,
+        setLearnInitialCategory,
+      ] = React.useState<TutorialCategory | null>(null);
 
       const { setInitialPackUserFriendlySlug } = React.useContext(
         AssetStoreContext
@@ -339,7 +357,6 @@ export const HomePage = React.memo<Props>(
                 onOpenProjectManager={onOpenProjectManager}
                 onSave={onSave}
                 canSave={canSave}
-                showUserChip={showUserChip}
               />
             );
           }
@@ -352,7 +369,6 @@ export const HomePage = React.memo<Props>(
           project,
           onSave,
           canSave,
-          showUserChip,
         ]
       );
 
@@ -364,16 +380,6 @@ export const HomePage = React.memo<Props>(
         [updateToolbar]
       );
 
-      React.useEffect(
-        () => {
-          // Always show the user chip, apart on the GetStarted page which handles it on its own.
-          if (activeTab !== 'get-started') {
-            setShowUserChip(true);
-          }
-        },
-        [activeTab]
-      );
-
       const forceUpdateEditor = React.useCallback(() => {
         // No updates to be done
       }, []);
@@ -383,16 +389,6 @@ export const HomePage = React.memo<Props>(
         updateToolbar,
         forceUpdateEditor,
       }));
-
-      // If the user logs out and is on the team view section, go back to the build section.
-      React.useEffect(
-        () => {
-          if (activeTab === 'team-view' && !authenticated) {
-            setActiveTab('build');
-          }
-        },
-        [authenticated, activeTab]
-      );
 
       const onUserSurveyStarted = React.useCallback(() => {
         if (userSurveyStartedRef.current) return;
@@ -456,13 +452,13 @@ export const HomePage = React.memo<Props>(
                   )}
                   {activeTab === 'get-started' && (
                     <GetStartedSection
-                      showUserChip={setShowUserChip}
                       selectInAppTutorial={selectInAppTutorial}
                       onUserSurveyStarted={onUserSurveyStarted}
                       onUserSurveyHidden={onUserSurveyHidden}
                       subscriptionPlansWithPricingSystems={
                         subscriptionPlansWithPricingSystems
                       }
+                      onOpenProfile={onOpenProfile}
                     />
                   )}
                   {activeTab === 'build' && (
@@ -489,6 +485,7 @@ export const HomePage = React.memo<Props>(
                       onOpenExampleStore={onOpenExampleStore}
                       onTabChange={setActiveTab}
                       selectInAppTutorial={selectInAppTutorial}
+                      initialCategory={learnInitialCategory}
                     />
                   )}
                   {activeTab === 'play' && <PlaySection />}
@@ -501,16 +498,32 @@ export const HomePage = React.memo<Props>(
                       onOpenPrivateGameTemplateListingData={
                         onOpenPrivateGameTemplateListingData
                       }
+                      onOpenProfile={onOpenProfile}
                     />
                   )}
-                  {activeTab === 'team-view' && (
-                    <TeamSection
-                      project={project}
-                      onOpenRecentFile={onOpenRecentFile}
-                      storageProviders={storageProviders}
-                      currentFileMetadata={fileMetadata}
-                    />
-                  )}
+                  {activeTab === 'team-view' &&
+                    (canUseClassroomFeature(limits) ? (
+                      <TeamSection
+                        project={project}
+                        onOpenRecentFile={onOpenRecentFile}
+                        storageProviders={storageProviders}
+                        currentFileMetadata={fileMetadata}
+                        onOpenTeachingResources={() => {
+                          setLearnInitialCategory('education-curriculum');
+                          setActiveTab('learn');
+                        }}
+                      />
+                    ) : (
+                      <EducationMarketingSection
+                        form={educationForm}
+                        onChangeForm={onChangeEducationForm}
+                        onSendForm={onSendEducationForm}
+                        formError={educationFormError}
+                        formStatus={educationFormStatus}
+                        onResetForm={onResetEducationForm}
+                        onLogin={onOpenLoginDialog}
+                      />
+                    ))}
                 </div>
                 <HomePageMenu
                   activeTab={activeTab}

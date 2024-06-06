@@ -23,10 +23,14 @@ import VariablesList, {
 import ShareExternal from '../../UI/CustomSvgIcons/ShareExternal';
 import useForceUpdate from '../../Utils/UseForceUpdate';
 import ErrorBoundary from '../../UI/ErrorBoundary';
+import { ProjectScopedContainersAccessor } from '../../InstructionOrExpression/EventsScope.flow';
+
+const gd: libGDevelop = global.gd;
 
 type Props = {|
   project: gdProject,
   layout: gdLayout,
+  projectScopedContainersAccessor: ProjectScopedContainersAccessor,
   instances: Array<gdInitialInstance>,
   onEditObjectByName: string => void,
   onInstancesModified?: (Array<gdInitialInstance>) => void,
@@ -279,6 +283,7 @@ const InstancePropertiesEditor = ({
   i18n,
   project,
   layout,
+  projectScopedContainersAccessor,
   unsavedChanges,
   historyHandler,
   onEditObjectByName,
@@ -326,8 +331,10 @@ const InstancePropertiesEditor = ({
       const properties = instance.getCustomProperties(project, layout);
       if (!object) return {};
 
-      // TODO (3D): Use 3D fields if any of the selected instances is 3D.
-      const is3DInstance = object.is3DObject();
+      const is3DInstance = gd.MetadataProvider.getObjectMetadata(
+        project.getCurrentPlatform(),
+        object.getType()
+      ).isRenderedIn3D();
       const instanceSchemaForCustomProperties = propertiesMapToSchema(
         properties,
         (instance: gdInitialInstance) =>
@@ -382,9 +389,11 @@ const InstancePropertiesEditor = ({
           </Column>
           {object ? (
             <VariablesList
+              projectScopedContainersAccessor={projectScopedContainersAccessor}
               directlyStoreValueChangesWhileEditing
               inheritedVariablesContainer={object.getVariables()}
               variablesContainer={instance.getVariables()}
+              areObjectVariables
               size="small"
               onComputeAllVariableNames={() =>
                 object
@@ -392,7 +401,7 @@ const InstancePropertiesEditor = ({
                       project.getCurrentPlatform(),
                       project,
                       layout,
-                      object
+                      object.getName()
                     )
                   : []
               }

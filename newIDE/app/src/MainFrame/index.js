@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import './MainFrame.css';
-import Drawer from '@material-ui/core/Drawer';
 import Snackbar from '@material-ui/core/Snackbar';
 import HomeIcon from '../UI/CustomSvgIcons/Home';
 import Toolbar, { type ToolbarInterface } from './Toolbar';
@@ -12,7 +11,6 @@ import AboutDialog from './AboutDialog';
 import ProjectManager from '../ProjectManager';
 import PlatformSpecificAssetsDialog from '../PlatformSpecificAssetsEditor/PlatformSpecificAssetsDialog';
 import LoaderModal from '../UI/LoaderModal';
-import DrawerTopBar from '../UI/DrawerTopBar';
 import CloseConfirmDialog from '../UI/CloseConfirmDialog';
 import ProfileDialog from '../Profile/ProfileDialog';
 import Window from '../Utils/Window';
@@ -74,12 +72,11 @@ import {
   getElectronUpdateNotificationBody,
   type ElectronUpdateStatus,
 } from './UpdaterTools';
-import EmptyMessage from '../UI/EmptyMessage';
 import ChangelogDialogContainer from './Changelog/ChangelogDialogContainer';
 import { type MessageDescriptor } from '../Utils/i18n/MessageDescriptor.flow';
 import { getNotNullTranslationFunction } from '../Utils/i18n/getTranslationFunction';
 import { type I18n } from '@lingui/core';
-import { t, Trans } from '@lingui/macro';
+import { t } from '@lingui/macro';
 import LanguageDialog from './Preferences/LanguageDialog';
 import PreferencesContext, {
   type InAppTutorialUserProgress,
@@ -174,7 +171,6 @@ import {
 import CustomDragLayer from '../UI/DragAndDrop/CustomDragLayer';
 import CloudProjectRecoveryDialog from '../ProjectsStorage/CloudStorageProvider/CloudProjectRecoveryDialog';
 import CloudProjectSaveChoiceDialog from '../ProjectsStorage/CloudStorageProvider/CloudProjectSaveChoiceDialog';
-import { dataObjectToProps } from '../Utils/HTMLDataset';
 import useCreateProject from '../Utils/UseCreateProject';
 import newNameGenerator from '../Utils/NewNameGenerator';
 import { addDefaultLightToAllLayers } from '../ProjectCreation/CreateProject';
@@ -183,18 +179,12 @@ import PixiResourcesLoader from '../ObjectsRendering/PixiResourcesLoader';
 import useResourcesWatcher from './ResourcesWatcher';
 import { extractGDevelopApiErrorStatusAndCode } from '../Utils/GDevelopServices/Errors';
 import useVersionHistory from '../VersionHistory/UseVersionHistory';
+import { ProjectManagerDrawer } from '../ProjectManager/ProjectManagerDrawer';
+import DiagnosticReportDialog from '../ExportAndShare/DiagnosticReportDialog';
+
 const GD_STARTUP_TIMES = global.GD_STARTUP_TIMES || [];
 
 const gd: libGDevelop = global.gd;
-
-const styles = {
-  drawerContent: {
-    width: 320,
-    overflowX: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-};
 
 const editorKindToRenderer: {
   [key: EditorKind]: (props: RenderEditorContainerPropsWithRef) => React.Node,
@@ -277,6 +267,7 @@ type LaunchPreviewOptions = {
   hotReload?: boolean,
   projectDataOnlyExport?: boolean,
   fullLoadingScreen?: boolean,
+  forceDiagnosticReport?: boolean,
 };
 
 export type Props = {|
@@ -447,6 +438,10 @@ const MainFrame = (props: Props) => {
   const [
     quitInAppTutorialDialogOpen,
     setQuitInAppTutorialDialogOpen,
+  ] = React.useState<boolean>(false);
+  const [
+    diagnosticReportDialogOpen,
+    setDiagnosticReportDialogOpen,
   ] = React.useState<boolean>(false);
   const [
     fileMetadataOpeningProgress,
@@ -1071,10 +1066,10 @@ const MainFrame = (props: Props) => {
       // Try to find an autosave (and ask user if found)
       try {
         await delay(150);
-        const autoSaveFileMetadata = await checkForAutosave();
         let content;
         let openingError: Error | null = null;
         try {
+          const autoSaveFileMetadata = await checkForAutosave();
           const result = await onOpen(
             autoSaveFileMetadata,
             setLoaderModalProgress
@@ -1544,6 +1539,7 @@ const MainFrame = (props: Props) => {
       hotReload,
       projectDataOnlyExport,
       fullLoadingScreen,
+      forceDiagnosticReport,
     }: LaunchPreviewOptions) => {
       if (!currentProject) return;
       if (currentProject.getLayoutsCount() === 0) return;
@@ -1613,17 +1609,33 @@ const MainFrame = (props: Props) => {
           if (inAppTutorialOrchestratorRef.current) {
             inAppTutorialOrchestratorRef.current.onPreviewLaunch();
           }
+          if (!currentlyRunningInAppTutorial) {
+            const wholeProjectDiagnosticReport = currentProject.getWholeProjectDiagnosticReport();
+            if (
+              (forceDiagnosticReport ||
+                preferences.values.openDiagnosticReportAutomatically) &&
+              wholeProjectDiagnosticReport.hasAnyIssue()
+            ) {
+              setDiagnosticReportDialogOpen(true);
+            }
+          }
         });
     },
     [
-      autosaveProjectIfNeeded,
       currentProject,
-      eventsFunctionsExtensionsState,
-      previewState,
       state.editorTabs,
+      previewState.isPreviewOverriden,
+      previewState.overridenPreviewLayoutName,
+      previewState.previewLayoutName,
+      previewState.overridenPreviewExternalLayoutName,
+      previewState.previewExternalLayoutName,
+      autosaveProjectIfNeeded,
+      authenticatedUser.profile,
+      eventsFunctionsExtensionsState,
       preferences.getIsMenuBarHiddenInPreview,
       preferences.getIsAlwaysOnTopInPreview,
-      authenticatedUser.profile,
+      preferences.values.openDiagnosticReportAutomatically,
+      currentlyRunningInAppTutorial,
     ]
   );
 
@@ -1645,6 +1657,11 @@ const MainFrame = (props: Props) => {
 
   const launchNetworkPreview = React.useCallback(
     () => launchPreview({ networkPreview: true, hotReload: false }),
+    [launchPreview]
+  );
+
+  const launchPreviewWithDiagnosticReport = React.useCallback(
+    () => launchPreview({ forceDiagnosticReport: true }),
     [launchPreview]
   );
 
@@ -1890,6 +1907,10 @@ const MainFrame = (props: Props) => {
         `Extension with name=${extensionName} can not be opened (no editor for this)`
       );
     }
+  };
+
+  const onExtractAsExternalLayout = (name: string) => {
+    openExternalLayout(name);
   };
 
   const _onProjectItemModified = () => {
@@ -2971,6 +2992,7 @@ const MainFrame = (props: Props) => {
     onHotReloadPreview: launchHotReloadPreview,
     onLaunchDebugPreview: launchDebuggerAndPreview,
     onLaunchNetworkPreview: launchNetworkPreview,
+    onLaunchPreviewWithDiagnosticReport: launchPreviewWithDiagnosticReport,
     onOpenHomePage: openHomePage,
     onCreateBlank: () => setNewProjectSetupDialogOpen(true),
     onOpenProject: () => openOpenFromStorageProviderDialog(),
@@ -3073,28 +3095,14 @@ const MainFrame = (props: Props) => {
         storageProvider={getStorageProvider()}
         i18n={i18n}
       />
-      <Drawer
-        open={projectManagerOpen}
-        PaperProps={{
-          style: styles.drawerContent,
-          className: 'safe-area-aware-left-container',
-        }}
-        ModalProps={{
-          keepMounted: true,
-        }}
-        onClose={toggleProjectManager}
-        {...dataObjectToProps({
-          open: projectManagerOpen ? 'true' : undefined,
-        })}
+      <ProjectManagerDrawer
+        projectManagerOpen={projectManagerOpen}
+        toggleProjectManager={toggleProjectManager}
+        title={
+          state.currentProject ? state.currentProject.getName() : 'No project'
+        }
       >
-        <DrawerTopBar
-          title={
-            state.currentProject ? state.currentProject.getName() : 'No project'
-          }
-          onClose={toggleProjectManager}
-          id="project-manager-drawer"
-        />
-        {currentProject && (
+        {currentProject ? (
           <ProjectManager
             project={currentProject}
             onChangeProjectName={onChangeProjectName}
@@ -3134,13 +3142,8 @@ const MainFrame = (props: Props) => {
             hotReloadPreviewButtonProps={hotReloadPreviewButtonProps}
             resourceManagementProps={resourceManagementProps}
           />
-        )}
-        {!state.currentProject && (
-          <EmptyMessage>
-            <Trans>To begin, open or create a new project.</Trans>
-          </EmptyMessage>
-        )}
-      </Drawer>
+        ) : null}
+      </ProjectManagerDrawer>
       <TabsTitlebar
         onBuildMenuTemplate={() =>
           adaptFromDeclarativeTemplate(
@@ -3187,6 +3190,7 @@ const MainFrame = (props: Props) => {
         onPreviewWithoutHotReload={launchNewPreview}
         onNetworkPreview={launchNetworkPreview}
         onHotReloadPreview={launchHotReloadPreview}
+        onLaunchPreviewWithDiagnosticReport={launchPreviewWithDiagnosticReport}
         canDoNetworkPreview={
           !!_previewLauncher.current &&
           _previewLauncher.current.canDoNetworkPreview()
@@ -3316,6 +3320,7 @@ const MainFrame = (props: Props) => {
                       cb(true);
                     },
                     openBehaviorEvents: openBehaviorEvents,
+                    onExtractAsExternalLayout: onExtractAsExternalLayout,
                   })}
                 </ErrorBoundary>
               </CommandsContextScopedProvider>
@@ -3397,6 +3402,8 @@ const MainFrame = (props: Props) => {
           }}
         />
       )}
+      {// Render example or game template dialogs before NewProjectSetupDialog to make sure it's always displayed on top
+      renderExampleOrGameTemplateDialogs()}
       {newProjectSetupDialogOpen && (
         <NewProjectSetupDialog
           authenticatedUser={authenticatedUser}
@@ -3486,7 +3493,6 @@ const MainFrame = (props: Props) => {
       {renderResourceMoverDialog()}
       {renderResourceFetcherDialog()}
       {renderVersionHistoryPanel()}
-      {renderExampleOrGameTemplateDialogs()}
       <CloseConfirmDialog
         shouldPrompt={!!state.currentProject}
         i18n={props.i18n}
@@ -3511,6 +3517,7 @@ const MainFrame = (props: Props) => {
           onClose={() => {
             setSelectedInAppTutorialInfo(null);
           }}
+          isProjectOpening={isProjectOpening}
         />
       )}
       {state.gdjsDevelopmentWatcherEnabled &&
@@ -3564,6 +3571,12 @@ const MainFrame = (props: Props) => {
           endTutorial={() => {
             endTutorial(true);
           }}
+        />
+      )}
+      {diagnosticReportDialogOpen && currentProject && (
+        <DiagnosticReportDialog
+          wholeProjectDiagnosticReport={currentProject.getWholeProjectDiagnosticReport()}
+          onClose={() => setDiagnosticReportDialogOpen(false)}
         />
       )}
       <CustomDragLayer />

@@ -22,8 +22,8 @@ endif()
 #
 # add_compile_options(-fsanitize=address) # Uncomment to auto-detect occurences of memory bugs (memory leak, use after free, overflows, ...) - also enable linking below!
 # add_compile_options(-fsanitize=undefined) # Uncomment to auto-detect occurences of undefined behavior - also enable linking below!
-# add_compile_options(-g) # Uncomment for debugging support
-# add_compile_options(--profiling) # Uncomment for profiling support
+# SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -g --profiling") # Uncomment for debugging + profiling support
+# SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --profiling") # Uncomment for profiling support
 
 # Common directories:
 #
@@ -81,6 +81,7 @@ target_link_libraries(GD "-s MODULARIZE=1")
 target_link_libraries(GD "-s EXPORT_NAME=\"initializeGDevelopJs\"") # Global function name for browsers
 target_link_libraries(GD "-s TOTAL_MEMORY=48MB") # Get some initial memory size that is a bit bigger than the default.
 target_link_libraries(GD "-s ALLOW_MEMORY_GROWTH=1")
+target_link_libraries(GD "-s NODEJS_CATCH_EXIT=0") # Don't print the entire GDCore code on error when running in node
 target_link_libraries(GD "-s ERROR_ON_UNDEFINED_SYMBOLS=0")
 target_link_libraries(GD "-s \"EXPORTED_FUNCTIONS=['_free']\"")
 

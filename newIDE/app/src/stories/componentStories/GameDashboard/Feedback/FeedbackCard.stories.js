@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 
-import muiDecorator from '../../../ThemeDecorator';
 import paperDecorator from '../../../PaperDecorator';
 
 import FeedbackCard from '../../../../GameDashboard/Feedbacks/FeedbackCard';
@@ -11,6 +10,7 @@ import FeedbackCard from '../../../../GameDashboard/Feedbacks/FeedbackCard';
 import {
   commentProcessed,
   commentUnprocessed,
+  commentWithNoTextUnprocessed,
   fakeSilverAuthenticatedUser,
   indieUserProfile,
 } from '../../../../fixtures/GDevelopServicesTestData';
@@ -18,12 +18,20 @@ import {
 export default {
   title: 'GameDashboard/Feedback/FeedbackCard',
   component: FeedbackCard,
-  decorators: [muiDecorator, paperDecorator],
+  decorators: [paperDecorator],
 };
 
 export const Default = () => (
   <FeedbackCard
     comment={commentUnprocessed}
+    authenticatedUser={fakeSilverAuthenticatedUser}
+    onCommentUpdated={action('onCommentUpdated')}
+  />
+);
+
+export const WithoutText = () => (
+  <FeedbackCard
+    comment={commentWithNoTextUnprocessed}
     authenticatedUser={fakeSilverAuthenticatedUser}
     onCommentUpdated={action('onCommentUpdated')}
   />

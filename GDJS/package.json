@@ -24,24 +24,13 @@
     "typedoc-plugin-reference-excluder": "^1.0.0",
     "typescript": "4.3.2"
   },
-  "overrides": {
-    "pixi-spine": {
-      "@pixi/assets": "7.3.0",
-      "@pixi/core": "7.3.0",
-      "@pixi/display": "7.3.0",
-      "@pixi/graphics": "7.3.0",
-      "@pixi/mesh": "7.3.0",
-      "@pixi/mesh-extras": "7.3.0",
-      "@pixi/sprite": "7.3.0"
-    }
-  },
   "scripts": {
-    "postinstall": "patch-package && node scripts/install-spine.js",
+    "postinstall": "patch-package",
     "check-types": "tsc",
     "build": "node scripts/build.js",
     "test": "cd tests && npm run test-benchmark",
-    "format": "prettier --write \"Runtime/**/*.ts\" \"../Extensions/**/*.ts\" \"../Extensions/**/*.spec.js\"",
-    "check-format": "prettier --list-different \"Runtime/**/*.ts\" \"../Extensions/**/*.ts\" \"../Extensions/**/*.spec.js\"",
+    "format": "prettier --write \"Runtime/**/*.ts\" \"../Extensions/**/*.ts\" \"../Extensions/**/JsExtension.js\" \"../Extensions/**/*.spec.js\"",
+    "check-format": "prettier --list-different \"Runtime/**/*.ts\" \"../Extensions/**/*.ts\" \"../Extensions/**/JsExtension.js\" \"../Extensions/**/*.spec.js\"",
     "generate-doc": "typedoc --options docs/typedoc.json"
   }
 }

@@ -3,16 +3,18 @@
  * Copyright 2008-2016 Florian Rival (Florian.Rival@gmail.com). All rights
  * reserved. This project is released under the MIT License.
  */
-#ifndef GDJS_OBJECTCODEGENERATOR_H
-#define GDJS_OBJECTCODEGENERATOR_H
+#pragma once
+
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "GDCore/Project/EventsBasedObject.h"
+#include "GDCore/Project/Project.h"
+
 namespace gd {
 class NamedPropertyDescriptor;
+class EventsBasedObject;
 }
 
 namespace gdjs {
@@ -32,7 +34,7 @@ class ObjectCodeGenerator {
    * object.
    */
   gd::String GenerateRuntimeObjectCompleteCode(
-      const gd::String& extensionName,
+      const gd::EventsFunctionsExtension& eventsFunctionsExtension,
       const gd::EventsBasedObject& eventsBasedObject,
       const gd::String& codeNamespace,
       const std::map<gd::String, gd::String>& objectMethodMangledNames,
@@ -74,7 +76,10 @@ class ObjectCodeGenerator {
       std::function<gd::String()> generateInitializePropertiesCode,
       std::function<gd::String()> generateMethodsCode,
       std::function<gd::String()> generatePropertiesCode,
-      std::function<gd::String()> generateUpdateFromObjectDataCode);
+      std::function<gd::String()> generateUpdateFromObjectDataCode,
+      std::function<gd::String()> generateInitializeAnimatableCode,
+      std::function<gd::String()> generateAnimatableCode,
+      std::function<gd::String()> generateTextContainerCode);
 
   gd::String GenerateRuntimeObjectPropertyTemplateCode(
       const gd::EventsBasedObject& eventsBasedObject,
@@ -104,7 +109,8 @@ class ObjectCodeGenerator {
       const gd::EventsBasedObject& eventsBasedObject,
       const gd::String& codeNamespace);
 
-  gd::String GenerateDoStepPreEventsPreludeCode();
+  gd::String GenerateDoStepPreEventsPreludeCode(
+      const gd::EventsBasedObject& eventsBasedObject);
 
   gd::Project& project;
 
@@ -113,4 +119,3 @@ class ObjectCodeGenerator {
 };
 
 }  // namespace gdjs
-#endif  // GDJS_OBJECTCODEGENERATOR_H

@@ -389,7 +389,7 @@ const generateFreeFunctionMetadata = (
   const functionFile = options.eventsFunctionCodeWriter.getIncludeFileFor(
     functionName
   );
-  instructionOrExpression.setIncludeFile(functionFile);
+  instructionOrExpression.addIncludeFile(functionFile);
 
   // Always include the extension include files when using a free function.
   codeGenerationContext.extensionIncludeFiles.forEach(includeFile => {
@@ -435,7 +435,7 @@ function generateBehavior(
       const includeFiles = new gd.SetString();
       const behaviorCodeGenerator = new gd.BehaviorCodeGenerator(project);
       const code = behaviorCodeGenerator.generateRuntimeBehaviorCompleteCode(
-        eventsFunctionsExtension.getName(),
+        eventsFunctionsExtension,
         eventsBasedBehavior,
         codeNamespace,
         behaviorMethodMangledNames,
@@ -498,7 +498,7 @@ function generateBehaviorMetadata(
     codeNamespace
   );
 
-  behaviorMetadata.setIncludeFile(includeFile);
+  behaviorMetadata.addIncludeFile(includeFile);
 
   // Always include the extension include files when using a behavior.
   codeGenerationContext.extensionIncludeFiles.forEach(includeFile => {
@@ -537,7 +537,7 @@ function generateObject(
       const includeFiles = new gd.SetString();
       const objectCodeGenerator = new gd.ObjectCodeGenerator(project);
       const code = objectCodeGenerator.generateRuntimeObjectCompleteCode(
-        eventsFunctionsExtension.getName(),
+        eventsFunctionsExtension,
         eventsBasedObject,
         codeNamespace,
         objectMethodMangledNames,
@@ -600,8 +600,8 @@ function generateObjectMetadata(
   const includeFile = options.eventsFunctionCodeWriter.getIncludeFileFor(
     codeNamespace
   );
-
-  objectMetadata.setIncludeFile(includeFile);
+  // Objects may already have included files for 3D for instance.
+  objectMetadata.addIncludeFile(includeFile);
 
   // Always include the extension include files when using an object.
   codeGenerationContext.extensionIncludeFiles.forEach(includeFile => {

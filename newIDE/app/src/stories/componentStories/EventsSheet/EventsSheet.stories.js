@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 
-import muiDecorator from '../../ThemeDecorator';
 import EventsSheet from '../../../EventsSheet';
 import DragAndDropContextProvider from '../../../UI/DragAndDrop/DragAndDropContextProvider';
 import FixedHeightFlexContainer from '../../FixedHeightFlexContainer';
@@ -13,7 +12,6 @@ import fakeResourceManagementProps from '../../FakeResourceManagement';
 export default {
   title: 'EventsSheet/EventsSheet',
   component: EventsSheet,
-  decorators: [muiDecorator],
 };
 
 export const DefaultNoScope = () => (
@@ -24,6 +22,9 @@ export const DefaultNoScope = () => (
         scope={{ project: testProject.project, layout: testProject.testLayout }}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.testLayout}
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         events={testProject.testLayout.getEvents()}
         onOpenExternalEvents={action('Open external events')}
         resourceManagementProps={fakeResourceManagementProps}
@@ -50,6 +51,9 @@ export const EmptyNoScope = () => (
         }}
         globalObjectsContainer={testProject.project}
         objectsContainer={testProject.emptyLayout}
+        projectScopedContainersAccessor={
+          testProject.emptySceneProjectScopedContainersAccessor
+        }
         events={testProject.emptyLayout.getEvents()}
         onOpenExternalEvents={action('Open external events')}
         resourceManagementProps={fakeResourceManagementProps}

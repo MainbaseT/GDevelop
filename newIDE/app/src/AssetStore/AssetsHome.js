@@ -25,6 +25,10 @@ import {
   PublicAssetPackTile,
   PrivateGameTemplateTile,
 } from './ShopTiles';
+import { useDebounce } from '../Utils/UseDebounce';
+import PromotionsSlideshow from '../Promotions/PromotionsSlideshow';
+import { ColumnStackLayout } from '../UI/Layout';
+import { EarnBadges } from '../MainFrame/EditorContainers/HomePage/GetStartedSection/EarnBadges';
 
 const cellSpacing = 2;
 
@@ -120,6 +124,27 @@ const styles = {
   },
 };
 
+const useProgressiveReveal = <T>({
+  list,
+  numberPerPage,
+}: {|
+  list: Array<T>,
+  numberPerPage: number,
+|}): {|
+  displayedList: Array<T>,
+  onShowMore: () => void,
+|} => {
+  const [pageCount, setPageCount] = React.useState(1);
+  const onShowMore = useDebounce(() => {
+    setPageCount(pageCount + 1);
+  }, 20);
+
+  return {
+    displayedList: list.slice(0, pageCount * numberPerPage),
+    onShowMore,
+  };
+};
+
 export type AssetsHomeInterface = {|
   getScrollPosition: () => number,
   scrollToPosition: (y: number) => void,
@@ -135,6 +160,8 @@ type Props = {|
   onCategorySelection: string => void,
   openedShopCategory: string | null,
   hideGameTemplates?: boolean,
+  displayPromotions?: boolean,
+  onOpenProfile?: () => void,
 |};
 
 export const AssetsHome = React.forwardRef<Props, AssetsHomeInterface>(
@@ -149,13 +176,18 @@ export const AssetsHome = React.forwardRef<Props, AssetsHomeInterface>(
       onCategorySelection,
       openedShopCategory,
       hideGameTemplates,
+      displayPromotions,
+      onOpenProfile,
     }: Props,
     ref
   ) => {
     const { windowSize, isLandscape } = useResponsiveWindowSize();
-    const { receivedAssetPacks, receivedGameTemplates } = React.useContext(
-      AuthenticatedUserContext
-    );
+    const {
+      receivedAssetPacks,
+      receivedGameTemplates,
+      badges,
+      achievements,
+    } = React.useContext(AuthenticatedUserContext);
 
     const scrollView = React.useRef<?ScrollViewInterface>(null);
     React.useImperativeHandle(ref, () => ({
@@ -323,11 +355,24 @@ export const AssetsHome = React.forwardRef<Props, AssetsHomeInterface>(
       ]
     );
 
+    const {
+      displayedList: displayedStandAloneTiles,
+      onShowMore: onShowMoreStandAloneTiles,
+    } = useProgressiveReveal({
+      list: allStandAloneTiles,
+      numberPerPage: 25,
+    });
+
     return (
       <ScrollView
         ref={scrollView}
         id="asset-store-home"
         data={{ isFiltered: !!openedShopCategory ? 'true' : 'false' }}
+        onScroll={({ remainingScreensToBottom }) => {
+          if (remainingScreensToBottom <= 1.5) {
+            onShowMoreStandAloneTiles();
+          }
+        }}
       >
         {openedShopCategory ? null : (
           <>
@@ -348,6 +393,22 @@ export const AssetsHome = React.forwardRef<Props, AssetsHomeInterface>(
             </GridList>
           </>
         )}
+        {displayPromotions ? (
+          <ColumnStackLayout>
+            <Text size="block-title">
+              <Trans>Promotions + Earn credits</Trans>
+            </Text>
+
+            <PromotionsSlideshow />
+            {onOpenProfile && (
+              <EarnBadges
+                achievements={achievements}
+                badges={badges}
+                onOpenProfile={onOpenProfile}
+              />
+            )}
+          </ColumnStackLayout>
+        ) : null}
         {allBundleTiles.length ? (
           <>
             <Column>
@@ -410,7 +471,7 @@ export const AssetsHome = React.forwardRef<Props, AssetsHomeInterface>(
           cellHeight="auto"
           spacing={cellSpacing}
         >
-          {allStandAloneTiles}
+          {displayedStandAloneTiles}
         </GridList>
       </ScrollView>
     );

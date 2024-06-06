@@ -1,7 +1,6 @@
 // @flow
 import * as React from 'react';
 
-import muiDecorator from '../../../ThemeDecorator';
 import paperDecorator from '../../../PaperDecorator';
 
 import ImageTileRow from '../../../../UI/ImageTileRow';
@@ -11,12 +10,13 @@ import {
   itemsWithJustImage,
   itemsWithOverlay,
   itemsWithTitleAndDescription,
+  itemsWithLocks,
 } from './data';
 
 export default {
   title: 'UI Building Blocks/ImageTile/ImageTileRow',
   component: ImageTileRow,
-  decorators: [paperDecorator, muiDecorator],
+  decorators: [paperDecorator],
 };
 
 const getColumnsFromWindowSize = (windowSize: WindowSizeType) => {
@@ -80,6 +80,17 @@ export const WithTitleAndDescription = () => (
 export const WithOverlay = () => (
   <ImageTileRow
     items={itemsWithOverlay}
+    title="Recommended templates"
+    onShowAll={() => {}}
+    showAllIcon={<Add fontSize="small" />}
+    getColumnsFromWindowSize={getColumnsFromWindowSize}
+    getLimitFromWindowSize={getColumnsFromWindowSize}
+  />
+);
+
+export const WithLocks = () => (
+  <ImageTileRow
+    items={itemsWithLocks}
     title="Recommended templates"
     onShowAll={() => {}}
     showAllIcon={<Add fontSize="small" />}

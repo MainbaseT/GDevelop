@@ -5,6 +5,7 @@ import {
   buyProductWithCredits,
   redeemPrivateAssetPack,
   type PrivateAssetPackListingData,
+  type PrivateGameTemplateListingData,
   getCalloutToGetSubscriptionOrClaimAssetPack,
 } from '../../Utils/GDevelopServices/Shop';
 import {
@@ -60,6 +61,7 @@ import useAlertDialog from '../../UI/Alert/useAlertDialog';
 import PasswordPromptDialog from '../PasswordPromptDialog';
 import Window from '../../Utils/Window';
 import RaisedButton from '../../UI/RaisedButton';
+import PrivateAssetPackPurchaseDialog from './PrivateAssetPackPurchaseDialog';
 
 const cellSpacing = 8;
 
@@ -136,9 +138,14 @@ const styles = {
 type Props = {|
   privateAssetPackListingData: PrivateAssetPackListingData,
   privateAssetPackListingDatasFromSameCreator?: ?Array<PrivateAssetPackListingData>,
-  onOpenPurchaseDialog: () => void,
   onAssetPackOpen: (
     privateAssetPackListingData: PrivateAssetPackListingData,
+    options?: {|
+      forceProductPage?: boolean,
+    |}
+  ) => void,
+  onGameTemplateOpen: (
+    privateGameTemplateListingData: PrivateGameTemplateListingData,
     options?: {|
       forceProductPage?: boolean,
     |}
@@ -149,8 +156,8 @@ type Props = {|
 const PrivateAssetPackInformationPage = ({
   privateAssetPackListingData,
   privateAssetPackListingDatasFromSameCreator,
-  onOpenPurchaseDialog,
   onAssetPackOpen,
+  onGameTemplateOpen,
   simulateAppStoreProduct,
 }: Props) => {
   const { id, name, sellerId } = privateAssetPackListingData;
@@ -173,6 +180,10 @@ const PrivateAssetPackInformationPage = ({
   const [selectedUsageType, setSelectedUsageType] = React.useState<string>(
     privateAssetPackListingData.prices[0].usageType
   );
+  const [
+    purchasingPrivateAssetPackListingData,
+    setPurchasingPrivateAssetPackListingData,
+  ] = React.useState<?PrivateAssetPackListingData>(null);
   const { openSubscriptionDialog } = React.useContext(
     SubscriptionSuggestionContext
   );
@@ -391,14 +402,13 @@ const PrivateAssetPackInformationPage = ({
           currency: price ? price.currency : undefined,
         });
 
-        onOpenPurchaseDialog();
+        setPurchasingPrivateAssetPackListingData(privateAssetPackListingData);
       } catch (e) {
         console.warn('Unable to send event', e);
       }
     },
     [
       assetPack,
-      onOpenPurchaseDialog,
       privateAssetPackListingData,
       isAlreadyReceived,
       onAssetPackOpen,
@@ -736,6 +746,10 @@ const PrivateAssetPackInformationPage = ({
                 onAssetPackOpen(assetPackListingData);
                 setOpenSellerPublicProfileDialog(false);
               }}
+              onGameTemplateOpen={gameTemplateListingData => {
+                onGameTemplateOpen(gameTemplateListingData);
+                setOpenSellerPublicProfileDialog(false);
+              }}
             />
           )}
           {displayPasswordPrompt && (
@@ -744,6 +758,15 @@ const PrivateAssetPackInformationPage = ({
               onClose={() => setDisplayPasswordPrompt(false)}
               passwordValue={password}
               setPasswordValue={setPassword}
+            />
+          )}
+          {!!purchasingPrivateAssetPackListingData && (
+            <PrivateAssetPackPurchaseDialog
+              privateAssetPackListingData={
+                purchasingPrivateAssetPackListingData
+              }
+              usageType={selectedUsageType}
+              onClose={() => setPurchasingPrivateAssetPackListingData(null)}
             />
           )}
         </>

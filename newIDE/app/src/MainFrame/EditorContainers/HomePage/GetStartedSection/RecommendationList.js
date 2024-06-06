@@ -18,7 +18,7 @@ import {
   type WindowSizeType,
 } from '../../../../UI/Responsive/ResponsiveWindowMeasurer';
 import Text from '../../../../UI/Text';
-import { Column } from '../../../../UI/Grid';
+import { Column, Line, Spacer } from '../../../../UI/Grid';
 import { type Tutorial } from '../../../../Utils/GDevelopServices/Tutorial';
 import { type SubscriptionPlanWithPricingSystems } from '../../../../Utils/GDevelopServices/Usage';
 import { CardWidget } from '../CardWidget';
@@ -30,6 +30,13 @@ import {
 } from '../../../../Utils/GDevelopServices/User';
 import PreferencesContext from '../../../Preferences/PreferencesContext';
 import PlanRecommendationRow from './PlanRecommendationRow';
+import { SurveyCard } from './SurveyCard';
+import PlaceholderLoader from '../../../../UI/PlaceholderLoader';
+import PromotionsSlideshow from '../../../../Promotions/PromotionsSlideshow';
+import { PrivateTutorialViewDialog } from '../../../../AssetStore/PrivateTutorials/PrivateTutorialViewDialog';
+import { EarnBadges } from './EarnBadges';
+import FlatButton from '../../../../UI/FlatButton';
+import InAppTutorialContext from '../../../../InAppTutorial/InAppTutorialContext';
 
 const styles = {
   textTutorialContent: {
@@ -172,18 +179,41 @@ type Props = {|
   authenticatedUser: AuthenticatedUser,
   selectInAppTutorial: (tutorialId: string) => void,
   subscriptionPlansWithPricingSystems: ?(SubscriptionPlanWithPricingSystems[]),
+  onStartSurvey: null | (() => void),
+  hasFilledSurveyAlready: boolean,
+  onOpenProfile: () => void,
 |};
 
 const RecommendationList = ({
   authenticatedUser,
   selectInAppTutorial,
   subscriptionPlansWithPricingSystems,
+  onStartSurvey,
+  hasFilledSurveyAlready,
+  onOpenProfile,
 }: Props) => {
-  const { recommendations, subscription, profile } = authenticatedUser;
+  const {
+    recommendations,
+    subscription,
+    limits,
+    badges,
+    achievements,
+  } = authenticatedUser;
   const { tutorials } = React.useContext(TutorialContext);
-  const { getTutorialProgress } = React.useContext(PreferencesContext);
+  const {
+    getTutorialProgress,
+    values: { showInAppTutorialDeveloperMode },
+  } = React.useContext(PreferencesContext);
+  const { onLoadInAppTutorialFromLocalFile } = React.useContext(
+    InAppTutorialContext
+  );
 
-  if (!recommendations) return null;
+  const [
+    selectedTutorial,
+    setSelectedTutorial,
+  ] = React.useState<Tutorial | null>(null);
+
+  if (!recommendations) return <PlaceholderLoader />;
 
   const recommendedTutorials = tutorials
     ? recommendations
@@ -215,7 +245,11 @@ const RecommendationList = ({
     recommendation => recommendation.type === 'plan'
   );
 
-  const getTutorialPartProgress = ({ tutorialId }: { tutorialId: string }) => {
+  const getInAppTutorialPartProgress = ({
+    tutorialId,
+  }: {
+    tutorialId: string,
+  }) => {
     const tutorialProgress = getTutorialProgress({
       tutorialId,
       userId: authenticatedUser.profile
@@ -231,38 +265,36 @@ const RecommendationList = ({
       {({ i18n }) => {
         const items = [];
 
-        if (recommendedVideoTutorials.length) {
+        if (onStartSurvey && !hasFilledSurveyAlready)
           items.push(
-            <SectionRow key="videos">
-              <ImageTileRow
-                title={<Trans>Watch</Trans>}
-                margin="dense"
-                items={recommendedVideoTutorials.map(tutorial =>
-                  formatTutorialToImageTileComponent(i18n, tutorial)
-                )}
-                getColumnsFromWindowSize={getVideoTutorialsColumnsFromWidth}
-                getLimitFromWindowSize={getTutorialsLimitsFromWidth}
+            <SectionRow key="start-survey">
+              <SurveyCard
+                onStartSurvey={onStartSurvey}
+                hasFilledSurveyAlready={false}
               />
             </SectionRow>
           );
-        }
+
         if (guidedLessonsRecommendation) {
           const displayTextAfterGuidedLessons = guidedLessonsIds
             ? guidedLessonsIds
-                .map(tutorialId => getTutorialPartProgress({ tutorialId }))
+                .map(tutorialId => getInAppTutorialPartProgress({ tutorialId }))
                 .every(progress => progress === 100)
             : false;
 
           items.push(
             <SectionRow key="guided-lessons">
-              <Text size="section-title" noMargin>
-                <Trans>Do</Trans>
-              </Text>
-              <Text>
-                <Trans>
-                  A selection of in-app tutorials to learn popular mechanics
-                </Trans>
-              </Text>
+              <Line justifyContent="space-between" noMargin>
+                <Text size="section-title" noMargin>
+                  <Trans>Build game mechanics</Trans>
+                </Text>
+                {showInAppTutorialDeveloperMode && (
+                  <FlatButton
+                    label={<Trans>Load local lesson</Trans>}
+                    onClick={onLoadInAppTutorialFromLocalFile}
+                  />
+                )}
+              </Line>
               <GuidedLessons
                 selectInAppTutorial={selectInAppTutorial}
                 lessonsIds={guidedLessonsIds}
@@ -278,6 +310,68 @@ const RecommendationList = ({
             </SectionRow>
           );
         }
+
+        if (
+          !limits ||
+          !limits.capabilities.classrooms ||
+          !limits.capabilities.classrooms.hidePlayTab
+        ) {
+          items.push(
+            <SectionRow key="earn-badges">
+              <Text size="section-title" noMargin>
+                <Trans>Earn badges and credits</Trans>
+              </Text>
+              <Spacer />
+              <EarnBadges
+                achievements={achievements}
+                badges={badges}
+                onOpenProfile={onOpenProfile}
+              />
+            </SectionRow>
+          );
+        }
+
+        if (recommendedVideoTutorials.length) {
+          items.push(
+            <SectionRow key="videos">
+              <ImageTileRow
+                title={<Trans>Get started with game creation</Trans>}
+                margin="dense"
+                items={recommendedVideoTutorials.map(tutorial =>
+                  formatTutorialToImageTileComponent({
+                    i18n,
+                    limits,
+                    tutorial,
+                    onSelectTutorial: setSelectedTutorial,
+                  })
+                )}
+                getColumnsFromWindowSize={getVideoTutorialsColumnsFromWidth}
+                getLimitFromWindowSize={getTutorialsLimitsFromWidth}
+              />
+            </SectionRow>
+          );
+        }
+
+        if (onStartSurvey && hasFilledSurveyAlready)
+          items.push(
+            <SectionRow key="start-survey">
+              <SurveyCard
+                onStartSurvey={onStartSurvey}
+                hasFilledSurveyAlready
+              />
+            </SectionRow>
+          );
+
+        items.push(
+          <SectionRow key="promotions">
+            <Text size="section-title" noMargin>
+              <Trans>Discover the ecosystem</Trans>
+            </Text>
+            <Spacer />
+            <PromotionsSlideshow />
+          </SectionRow>
+        );
+
         if (recommendedTextTutorials.length) {
           items.push(
             <SectionRow key="texts">
@@ -287,8 +381,11 @@ const RecommendationList = ({
         }
         if (planRecommendation) {
           const shouldDisplayPlanRecommendation =
-            profile &&
-            !profile.isStudent &&
+            limits &&
+            !(
+              limits.capabilities.classrooms &&
+              limits.capabilities.classrooms.hideUpgradeNotice
+            ) &&
             (!subscription ||
               isPlanRecommendationRelevant(subscription, planRecommendation));
           if (
@@ -308,7 +405,18 @@ const RecommendationList = ({
             );
           }
         }
-        return items;
+
+        return (
+          <>
+            {items}
+            {selectedTutorial && (
+              <PrivateTutorialViewDialog
+                tutorial={selectedTutorial}
+                onClose={() => setSelectedTutorial(null)}
+              />
+            )}
+          </>
+        );
       }}
     </I18n>
   );

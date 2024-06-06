@@ -1,6 +1,5 @@
 // @flow
 import * as React from 'react';
-import muiDecorator from '../ThemeDecorator';
 import paperDecorator from '../PaperDecorator';
 import GDevelopJsInitializerDecorator, {
   testProject,
@@ -13,6 +12,9 @@ export const Default = () => (
   <DragAndDropContextProvider>
     <FixedHeightFlexContainer height={600}>
       <VariablesList
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         variablesContainer={testProject.testLayout.getVariables()}
         emptyPlaceholderDescription="Variables help you store data"
         emptyPlaceholderTitle="Variables"
@@ -31,7 +33,11 @@ export const InstanceWithObjectVariables = () => (
   <DragAndDropContextProvider>
     <FixedHeightFlexContainer height={600}>
       <VariablesList
+        projectScopedContainersAccessor={
+          testProject.testSceneProjectScopedContainersAccessor
+        }
         variablesContainer={testProject.testSpriteObjectInstance.getVariables()}
+        areObjectVariables
         emptyPlaceholderDescription="Variables help you store data"
         emptyPlaceholderTitle="Variables"
         helpPagePath="/variables"
@@ -49,5 +55,5 @@ export const InstanceWithObjectVariables = () => (
 export default {
   title: 'VariablesList',
   component: VariablesList,
-  decorators: [paperDecorator, muiDecorator, GDevelopJsInitializerDecorator],
+  decorators: [paperDecorator, GDevelopJsInitializerDecorator],
 };

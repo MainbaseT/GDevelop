@@ -1,8 +1,6 @@
 // @flow
 import * as React from 'react';
 
-import muiDecorator from '../../ThemeDecorator';
-
 import { testProject } from '../../GDevelopJsInitializerDecorator';
 import ValueStateHolder from '../../ValueStateHolder';
 
@@ -35,6 +33,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -55,6 +56,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -75,6 +79,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -95,6 +102,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -115,6 +125,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -135,6 +148,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -155,6 +171,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -175,6 +194,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -195,6 +217,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -215,6 +240,9 @@ export const AllResourceFields = () => (
             }}
             globalObjectsContainer={testProject.project}
             objectsContainer={testProject.testLayout}
+            projectScopedContainersAccessor={
+              testProject.testSceneProjectScopedContainersAccessor
+            }
             value={value}
             onChange={onChange}
             parameterRenderingService={ParameterRenderingService}
@@ -229,5 +257,4 @@ export const AllResourceFields = () => (
 export default {
   title: 'ParameterFields',
   component: AllResourceFields,
-  decorators: [muiDecorator],
 };

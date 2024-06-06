@@ -3,8 +3,8 @@
  * Copyright 2008-2016 Florian Rival (Florian.Rival@gmail.com). All rights
  * reserved. This project is released under the MIT License.
  */
-#ifndef GDCORE_OBJECT_H
-#define GDCORE_OBJECT_H
+#pragma once
+
 #include <map>
 #include <memory>
 #include <vector>
@@ -120,9 +120,6 @@ class GD_CORE_API Object {
    */
   const gd::String& GetType() const { return configuration->GetType(); }
 
-  /** \brief Shortcut to check if the object is a 3D object.
-   */
-  bool Is3DObject() const { return configuration->Is3DObject(); }
   ///@}
 
   /** \name Behaviors management
@@ -290,5 +287,3 @@ struct ObjectHasName : public std::binary_function<std::unique_ptr<gd::Object>,
 };
 
 }  // namespace gd
-
-#endif  // GDCORE_OBJECT_H

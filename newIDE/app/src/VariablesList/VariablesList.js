@@ -53,6 +53,7 @@ import {
   getDirectParentVariable,
   getMovementTypeWithinVariablesContainer,
   getOldestAncestryVariable,
+  getNodeIdFromVariableName,
   getVariableContextFromNodeId,
   inheritedPrefix,
   isAnAncestryOf,
@@ -77,6 +78,8 @@ import Text from '../UI/Text';
 import { MultilineVariableEditorDialog } from './MultilineVariableEditorDialog';
 import { MarkdownText } from '../UI/MarkdownText';
 import Paper from '../UI/Paper';
+import { ProjectScopedContainersAccessor } from '../InstructionOrExpression/EventsScope.flow';
+
 const gd: libGDevelop = global.gd;
 
 const DragSourceAndDropTarget = makeDragSourceAndDropTarget('variable-editor');
@@ -95,8 +98,11 @@ export type HistoryHandler = {|
 |};
 
 type Props = {|
+  projectScopedContainersAccessor: ProjectScopedContainersAccessor,
   variablesContainer: gdVariablesContainer,
+  areObjectVariables?: boolean,
   inheritedVariablesContainer?: gdVariablesContainer,
+  initiallySelectedVariableName?: string,
   /** Callback executed at mount to compute suggestions. */
   onComputeAllVariableNames?: () => Array<string>,
   /** To specify if history should be handled by parent. */
@@ -109,10 +115,12 @@ type Props = {|
   /** If set to small, will collapse variable row by default. */
   size?: 'small',
   onVariablesUpdated?: () => void,
+  toolbarIconStyle?: any,
+  onSelectedVariableChange?: (Array<string>) => void,
 |};
 
 const variableRowStyles = {
-  chevron: { width: 15 },
+  chevron: { width: 15, alignSelf: 'stretch' },
 };
 
 type VariableRowProps = {|
@@ -523,12 +531,30 @@ const VariablesList = (props: Props) => {
   );
 
   const [searchText, setSearchText] = React.useState<string>('');
-  const { onComputeAllVariableNames } = props;
+  const { onComputeAllVariableNames, onSelectedVariableChange } = props;
   const allVariablesNames = React.useMemo<?Array<string>>(
     () => (onComputeAllVariableNames ? onComputeAllVariableNames() : null),
     [onComputeAllVariableNames]
   );
-  const [selectedNodes, setSelectedNodes] = React.useState<Array<string>>([]);
+  // TODO Scroll to the initially selected variable and focus on the name.
+  const [selectedNodes, doSetSelectedNodes] = React.useState<Array<string>>(
+    props.initiallySelectedVariableName
+      ? [getNodeIdFromVariableName(props.initiallySelectedVariableName)]
+      : []
+  );
+  const setSelectedNodes = React.useCallback(
+    (nodes: Array<string> | ((nodes: Array<string>) => Array<string>)) => {
+      doSetSelectedNodes(selectedNodes => {
+        const newNodes = Array.isArray(nodes) ? nodes : nodes(selectedNodes);
+        if (onSelectedVariableChange) {
+          onSelectedVariableChange(newNodes);
+        }
+        return newNodes;
+      });
+    },
+    [onSelectedVariableChange]
+  );
+
   const [searchMatchingNodes, setSearchMatchingNodes] = React.useState<
     Array<string>
   >([]);
@@ -627,7 +653,7 @@ const VariablesList = (props: Props) => {
         historyRef.current = undo(historyRef.current, props.variablesContainer);
       setSelectedNodes([]);
     },
-    [historyRef, historyHandler, props.variablesContainer]
+    [historyHandler, historyRef, props.variablesContainer, setSelectedNodes]
   );
 
   const _redo = React.useCallback(
@@ -637,7 +663,7 @@ const VariablesList = (props: Props) => {
         historyRef.current = redo(historyRef.current, props.variablesContainer);
       setSelectedNodes([]);
     },
-    [historyRef, historyHandler, props.variablesContainer]
+    [historyHandler, historyRef, props.variablesContainer, setSelectedNodes]
   );
 
   const _canUndo = (): boolean =>
@@ -812,6 +838,7 @@ const VariablesList = (props: Props) => {
       props.inheritedVariablesContainer,
       props.variablesContainer,
       selectedNodes,
+      setSelectedNodes,
     ]
   );
 
@@ -866,7 +893,7 @@ const VariablesList = (props: Props) => {
         setSelectedNodes([]);
       }
     },
-    [_onChange, _deleteNode, selectedNodes]
+    [selectedNodes, _deleteNode, _onChange, setSelectedNodes]
   );
 
   const updateExpandedAndSelectedNodesFollowingNameChange = React.useCallback(
@@ -884,7 +911,7 @@ const VariablesList = (props: Props) => {
         );
       }
     },
-    [searchText]
+    [searchText, setSelectedNodes]
   );
 
   const updateExpandedAndSelectedNodesFollowingNodeMove = React.useCallback(
@@ -896,7 +923,7 @@ const VariablesList = (props: Props) => {
         forceUpdate();
       }
     },
-    [forceUpdate, searchText, triggerSearch]
+    [forceUpdate, searchText, setSelectedNodes, triggerSearch]
   );
 
   const canDrop = React.useCallback(
@@ -1134,8 +1161,10 @@ const VariablesList = (props: Props) => {
         const name = newNameGenerator('ChildVariable', name =>
           variable.hasChild(name)
         );
-        variable.getChild(name).setString('');
-      } else if (type === gd.Variable.Array) variable.pushNew();
+        variable.getChild(name);
+      } else if (type === gd.Variable.Array) {
+        variable.pushNew();
+      }
       _onChange();
       if (variable.isFolded()) variable.setFolded(false);
       forceUpdate();
@@ -1169,7 +1198,12 @@ const VariablesList = (props: Props) => {
       setSelectedNodes([inheritedVariableName]);
       newVariable.delete();
     },
-    [_onChange, props.inheritedVariablesContainer, props.variablesContainer]
+    [
+      _onChange,
+      props.inheritedVariablesContainer,
+      props.variablesContainer,
+      setSelectedNodes,
+    ]
   );
 
   const onAdd = React.useCallback(
@@ -1223,6 +1257,7 @@ const VariablesList = (props: Props) => {
       props.variablesContainer,
       refocusNameField,
       selectedNodes,
+      setSelectedNodes,
     ]
   );
 
@@ -1248,7 +1283,7 @@ const VariablesList = (props: Props) => {
         }
       });
     },
-    []
+    [setSelectedNodes]
   );
 
   const renderVariableAndChildrenRows = (
@@ -1449,16 +1484,15 @@ const VariablesList = (props: Props) => {
             gd.Project.getSafeName(cleanedName)
           : // Child variables of structures must "just" be not empty.
             cleanedName || 'Unnamed',
-        tentativeNewName => {
-          if (
-            (parentVariable && parentVariable.hasChild(tentativeNewName)) ||
-            (!parentVariable && props.variablesContainer.has(tentativeNewName))
-          ) {
-            return true;
-          }
-
-          return false;
-        }
+        tentativeNewName =>
+          (parentVariable && parentVariable.hasChild(tentativeNewName)) ||
+          (!parentVariable &&
+            (props.variablesContainer.has(tentativeNewName) ||
+              (!props.areObjectVariables &&
+                props.projectScopedContainersAccessor
+                  .get()
+                  .getObjectsContainersList()
+                  .hasObjectOrGroupNamed(tentativeNewName))))
       );
 
       if (!parentVariable) {
@@ -1475,8 +1509,10 @@ const VariablesList = (props: Props) => {
       refocusNameField({ identifier: variable.ptr });
     },
     [
-      _onChange,
       props.variablesContainer,
+      props.areObjectVariables,
+      props.projectScopedContainersAccessor,
+      _onChange,
       updateExpandedAndSelectedNodesFollowingNameChange,
       refocusNameField,
     ]
@@ -1606,6 +1642,7 @@ const VariablesList = (props: Props) => {
       props.inheritedVariablesContainer,
       props.variablesContainer,
       refocusValueField,
+      setSelectedNodes,
     ]
   );
 
@@ -1659,6 +1696,7 @@ const VariablesList = (props: Props) => {
       onAdd={onAdd}
       searchText={searchText}
       onChangeSearchText={setSearchText}
+      iconStyle={props.toolbarIconStyle}
     />
   );
 
@@ -1682,7 +1720,6 @@ const VariablesList = (props: Props) => {
                   style={{ flex: 1, display: 'flex', minHeight: 0 }}
                   onKeyDown={keyboardShortcuts.onKeyDown}
                   onKeyUp={keyboardShortcuts.onKeyUp}
-                  className={gdevelopTheme.uiRootClassName}
                 >
                   <Column expand useFullHeight noMargin>
                     {isNarrow ? null : toolbar}

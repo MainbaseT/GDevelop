@@ -21,11 +21,19 @@ import { Toolbar, ToolbarGroup } from '../../../UI/Toolbar';
 import AuthenticatedUserContext from '../../../Profile/AuthenticatedUserContext';
 
 const iconSize = 20;
-const iconButtonPaddingVertical = 8;
-const iconButtonPaddingHorizontal = 5;
-const iconButtonLabelPadding = 6;
+const iconButtonPaddingTop = 8;
+/**
+ * Padding bottom is bigger than padding top to leave space for the Android/iOS
+ * bottom navigation bar.
+ */
+const iconButtonPaddingBottom = 20;
+const iconButtonPaddingHorizontal = 8;
+const iconButtonLabelPadding = 4;
 const toolbarHeight =
-  iconSize + 2 * iconButtonLabelPadding + 2 * iconButtonPaddingVertical;
+  iconSize +
+  2 * iconButtonLabelPadding +
+  iconButtonPaddingTop +
+  iconButtonPaddingBottom;
 export const homepageDesktopMenuBarWidth = 230;
 export const homepageMediumMenuBarWidth =
   verticalTabButtonSize + 2 * marginsSize;
@@ -53,7 +61,7 @@ export const styles = {
     marginBottom: 'env(safe-area-inset-bottom)',
   },
   mobileButton: {
-    padding: `${iconButtonPaddingVertical}px ${iconButtonPaddingHorizontal}px`,
+    padding: `${iconButtonPaddingTop}px ${iconButtonPaddingHorizontal}px ${iconButtonPaddingBottom}px ${iconButtonPaddingHorizontal}px`,
     fontSize: 'inherit',
   },
   buttonLabel: { padding: iconButtonLabelPadding, display: 'flex' },
@@ -77,9 +85,9 @@ const HomePageMenuBar = ({
   const { isMobile, isMediumScreen } = useResponsiveWindowSize();
   const isMobileOrSmallScreen = isMobile || isMediumScreen;
   const theme = React.useContext(GDevelopThemeContext);
-  const { profile } = React.useContext(AuthenticatedUserContext);
-  const tabsToDisplay = getTabsToDisplay({ profile });
-  const buttons: {
+  const { limits } = React.useContext(AuthenticatedUserContext);
+  const tabsToDisplay = getTabsToDisplay({ limits });
+  const largeScreenOnlyButtons: {
     label: React.Node,
     getIcon: GetIconFunction,
     id: string,
@@ -139,29 +147,6 @@ const HomePageMenuBar = ({
                 </IconButton>
               );
             })}
-            <span
-              style={{
-                width: 1,
-                backgroundColor: theme.home.separator.color,
-                height: '70%',
-                margin: '0 3px',
-              }}
-            />
-            {buttons.map(({ label, onClick, getIcon, id }) => (
-              <IconButton
-                color="default"
-                key={id}
-                disableRipple
-                disableFocusRipple
-                style={styles.mobileButton}
-                onClick={onClick}
-                id={id}
-              >
-                <span style={styles.buttonLabel}>
-                  {getIcon({ color: 'secondary', fontSize: 'inherit' })}
-                </span>
-              </IconButton>
-            ))}
           </ToolbarGroup>
         </Toolbar>
       </Paper>
@@ -198,7 +183,7 @@ const HomePageMenuBar = ({
 
       <div style={styles.bottomButtonsContainer}>
         <Column>
-          {buttons.map(({ label, getIcon, onClick, id }) => (
+          {largeScreenOnlyButtons.map(({ label, getIcon, onClick, id }) => (
             <VerticalTabButton
               key={id}
               label={label}

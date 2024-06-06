@@ -1,7 +1,6 @@
 // @flow
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
-import muiDecorator from '../../ThemeDecorator';
 import { HomePage } from '../../../MainFrame/EditorContainers/HomePage';
 import GDevelopJsInitializerDecorator, {
   testProject,
@@ -108,6 +107,9 @@ const WrappedHomePage = ({
           fetchInAppTutorials: async () => {
             action('fetch tutorials')();
           },
+          onLoadInAppTutorialFromLocalFile: async () => {
+            action('load in app tutorial from local file')();
+          },
         }}
       >
         <AuthenticatedUserContext.Provider value={user}>
@@ -158,7 +160,7 @@ const WrappedHomePage = ({
 export default {
   title: 'HomePage',
   component: WrappedHomePage,
-  decorators: [muiDecorator, GDevelopJsInitializerDecorator],
+  decorators: [GDevelopJsInitializerDecorator],
 };
 
 export const BuildSectionLoading = () => (

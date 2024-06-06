@@ -19,6 +19,7 @@ class ExternalLayout;
 class SerializerElement;
 class AbstractFileSystem;
 class ResourcesManager;
+class WholeProjectDiagnosticReport;
 }  // namespace gd
 class wxProgressDialog;
 
@@ -325,10 +326,11 @@ class ExporterHelper {
    * includesFiles A reference to a vector that will be filled with JS files to
    * be exported along with the project. ( including "codeX.js" files ).
    */
-  bool ExportEventsCode(const gd::Project &project,
-                        gd::String outputDir,
-                        std::vector<gd::String> &includesFiles,
-                        bool exportForPreview);
+  bool ExportEventsCode(
+      const gd::Project &project, gd::String outputDir,
+      std::vector<gd::String> &includesFiles,
+      gd::WholeProjectDiagnosticReport &wholeProjectDiagnosticReport,
+      bool exportForPreview);
 
   /**
    * \brief Add the project effects include files.
@@ -437,6 +439,14 @@ class ExporterHelper {
    */
   bool ExportFacebookInstantGamesFiles(const gd::Project &project,
                                        gd::String exportDir);
+
+  /**
+   * \brief Generate any HTML5 specific file.
+   *
+   * \param project The project to be used to generate the files.
+   * \param exportDir The directory where the files must be created.
+   */
+  bool ExportHtml5Files(const gd::Project &project, gd::String exportDir);
 
   /**
    * \brief Create a preview for the specified options.

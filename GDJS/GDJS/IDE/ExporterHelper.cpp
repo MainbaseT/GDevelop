@@ -18,6 +18,7 @@
 
 #include "GDCore/CommonTools.h"
 #include "GDCore/Events/CodeGeneration/EffectsCodeGenerator.h"
+#include "GDCore/Events/CodeGeneration/DiagnosticReport.h"
 #include "GDCore/Extensions/Metadata/DependencyMetadata.h"
 #include "GDCore/Extensions/Metadata/MetadataProvider.h"
 #include "GDCore/Extensions/Platform.h"
@@ -172,9 +173,15 @@ bool ExporterHelper::ExportProjectForPixiPreview(
   previousTime = LogTimeSpent("Include files export", previousTime);
 
   if (!options.projectDataOnlyExport) {
+    gd::WholeProjectDiagnosticReport &wholeProjectDiagnosticReport =
+        options.project.GetWholeProjectDiagnosticReport();
+    wholeProjectDiagnosticReport.Clear();
+
     // Generate events code
-    if (!ExportEventsCode(immutableProject, codeOutputDir, includesFiles, true))
+    if (!ExportEventsCode(immutableProject, codeOutputDir, includesFiles,
+                          wholeProjectDiagnosticReport, true)) {
       return false;
+    }
 
     // Export source files
     if (!ExportExternalSourceFiles(
@@ -194,7 +201,7 @@ bool ExporterHelper::ExportProjectForPixiPreview(
   for (std::size_t layoutIndex = 0;
        layoutIndex < exportedProject.GetLayoutsCount(); layoutIndex++) {
     auto &layout = exportedProject.GetLayout(layoutIndex);
-    scenesUsedResources[layout.GetName()] = 
+    scenesUsedResources[layout.GetName()] =
         gd::SceneResourcesFinder::FindSceneResources(exportedProject,
                                                           layout);
   }
@@ -513,6 +520,16 @@ bool ExporterHelper::ExportCordovaFiles(const gd::Project &project,
     }
   }
 
+  {
+    gd::String str =
+        fs.ReadFile(gdjsRoot + "/Runtime/Cordova/www/LICENSE.GDevelop.txt");
+
+    if (!fs.WriteToFile(exportDir + "/www/LICENSE.GDevelop.txt", str)) {
+      lastError = "Unable to write Cordova LICENSE.GDevelop.txt file.";
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -530,6 +547,27 @@ bool ExporterHelper::ExportFacebookInstantGamesFiles(const gd::Project &project,
     if (!fs.WriteToFile(exportDir + "/fbapp-config.json", str)) {
       lastError =
           "Unable to write Facebook Instant Games fbapp-config.json file.";
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ExporterHelper::ExportHtml5Files(const gd::Project &project,
+                                                     gd::String exportDir) {
+  if (!fs.WriteToFile(exportDir + "/manifest.webmanifest",
+                      GenerateWebManifest(project))) {
+    lastError = "Unable to export WebManifest.";
+    return false;
+  }
+
+  {
+    gd::String str =
+        fs.ReadFile(gdjsRoot + "/Runtime/Electron/LICENSE.GDevelop.txt");
+
+    if (!fs.WriteToFile(exportDir + "/LICENSE.GDevelop.txt", str)) {
+      lastError = "Unable to write LICENSE.GDevelop.txt file.";
       return false;
     }
   }
@@ -611,6 +649,16 @@ bool ExporterHelper::ExportElectronFiles(const gd::Project &project,
 
     if (!fs.WriteToFile(exportDir + "/main.js", str)) {
       lastError = "Unable to write Electron main.js file.";
+      return false;
+    }
+  }
+
+  {
+    gd::String str =
+        fs.ReadFile(gdjsRoot + "/Runtime/Electron/LICENSE.GDevelop.txt");
+
+    if (!fs.WriteToFile(exportDir + "/LICENSE.GDevelop.txt", str)) {
+      lastError = "Unable to write Electron LICENSE.GDevelop.txt file.";
       return false;
     }
   }
@@ -704,10 +752,12 @@ void ExporterHelper::AddLibsInclude(bool pixiRenderers,
   InsertUnique(includesFiles, "variablescontainer.js");
   InsertUnique(includesFiles, "oncetriggers.js");
   InsertUnique(includesFiles, "runtimebehavior.js");
+  InsertUnique(includesFiles, "SpriteAnimator.js");
   InsertUnique(includesFiles, "spriteruntimeobject.js");
   InsertUnique(includesFiles, "affinetransformation.js");
   InsertUnique(includesFiles, "CustomRuntimeObjectInstanceContainer.js");
   InsertUnique(includesFiles, "CustomRuntimeObject.js");
+  InsertUnique(includesFiles, "CustomRuntimeObject2D.js");
 
   // Common includes for events only.
   InsertUnique(includesFiles, "events-tools/commontools.js");
@@ -761,7 +811,7 @@ void ExporterHelper::AddLibsInclude(bool pixiRenderers,
     InsertUnique(includesFiles, "pixi-renderers/pixi-bitmapfont-manager.js");
     InsertUnique(includesFiles,
                  "pixi-renderers/spriteruntimeobject-pixi-renderer.js");
-    InsertUnique(includesFiles, "pixi-renderers/CustomObjectPixiRenderer.js");
+    InsertUnique(includesFiles, "pixi-renderers/CustomRuntimeObject2DPixiRenderer.js");
     InsertUnique(includesFiles, "pixi-renderers/DebuggerPixiRenderer.js");
     InsertUnique(includesFiles,
                  "pixi-renderers/loadingscreen-pixi-renderer.js");
@@ -773,6 +823,12 @@ void ExporterHelper::AddLibsInclude(bool pixiRenderers,
     InsertUnique(
         includesFiles,
         "fontfaceobserver-font-manager/fontfaceobserver-font-manager.js");
+  }
+  if (pixiInThreeRenderers) {
+    InsertUnique(includesFiles, "Extensions/3D/A_RuntimeObject3D.js");
+    InsertUnique(includesFiles, "Extensions/3D/A_RuntimeObject3DRenderer.js");
+    InsertUnique(includesFiles, "Extensions/3D/CustomRuntimeObject3D.js");
+    InsertUnique(includesFiles, "Extensions/3D/CustomRuntimeObject3DRenderer.js");
   }
 }
 
@@ -802,18 +858,24 @@ bool ExporterHelper::ExportEffectIncludes(
   return true;
 }
 
-bool ExporterHelper::ExportEventsCode(const gd::Project &project,
-                                      gd::String outputDir,
-                                      std::vector<gd::String> &includesFiles,
-                                      bool exportForPreview) {
+bool ExporterHelper::ExportEventsCode(
+    const gd::Project &project, gd::String outputDir,
+    std::vector<gd::String> &includesFiles,
+    gd::WholeProjectDiagnosticReport &wholeProjectDiagnosticReport,
+    bool exportForPreview) {
   fs.MkDir(outputDir);
 
   for (std::size_t i = 0; i < project.GetLayoutsCount(); ++i) {
     std::set<gd::String> eventsIncludes;
     const gd::Layout &layout = project.GetLayout(i);
+
+    auto &diagnosticReport = wholeProjectDiagnosticReport.AddNewDiagnosticReportForScene(
+            layout.GetName());
     LayoutCodeGenerator layoutCodeGenerator(project);
     gd::String eventsOutput = layoutCodeGenerator.GenerateLayoutCompleteCode(
-        layout, eventsIncludes, !exportForPreview);
+        layout, eventsIncludes,
+        diagnosticReport,
+        !exportForPreview);
     gd::String filename =
         outputDir + "/" + "code" + gd::String::From(i) + ".js";
 

@@ -2,7 +2,6 @@
 import * as React from 'react';
 import { action } from '@storybook/addon-actions';
 
-import muiDecorator from '../../ThemeDecorator';
 import paperDecorator from '../../PaperDecorator';
 import DragAndDropContextProvider from '../../../UI/DragAndDrop/DragAndDropContextProvider';
 import {
@@ -27,7 +26,7 @@ import sample from 'lodash/sample';
 export default {
   title: 'HomePage/TeamSection',
   component: TeamSection,
-  decorators: [paperDecorator, muiDecorator],
+  decorators: [paperDecorator],
 };
 
 const team: Team = {
@@ -284,6 +283,7 @@ export const Default = () => (
         currentFileMetadata={null}
         onOpenRecentFile={action('onOpenRecentFile')}
         storageProviders={[CloudStorageProvider]}
+        onOpenTeachingResources={action('onOpenTeachingResources')}
       />
     </FixedHeightFlexContainer>
   </MockTeamProvider>
@@ -297,6 +297,7 @@ export const WithNoGroupsYet = () => (
         currentFileMetadata={null}
         onOpenRecentFile={action('onOpenRecentFile')}
         storageProviders={[CloudStorageProvider]}
+        onOpenTeachingResources={action('onOpenTeachingResources')}
       />
     </FixedHeightFlexContainer>
   </MockTeamProvider>
@@ -310,6 +311,7 @@ export const Loading = () => (
         currentFileMetadata={null}
         onOpenRecentFile={action('onOpenRecentFile')}
         storageProviders={[CloudStorageProvider]}
+        onOpenTeachingResources={action('onOpenTeachingResources')}
       />
     </FixedHeightFlexContainer>
   </MockTeamProvider>

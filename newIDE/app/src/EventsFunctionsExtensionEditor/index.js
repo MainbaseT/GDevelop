@@ -6,7 +6,10 @@ import { type I18n as I18nType } from '@lingui/core';
 
 import * as React from 'react';
 import EventsSheet, { type EventsSheetInterface } from '../EventsSheet';
-import EditorMosaic, { mosaicContainsNode } from '../UI/EditorMosaic';
+import EditorMosaic, {
+  type EditorMosaicInterface,
+  mosaicContainsNode,
+} from '../UI/EditorMosaic';
 import EmptyMessage from '../UI/EmptyMessage';
 import EventsFunctionConfigurationEditor from './EventsFunctionConfigurationEditor';
 import EventsFunctionsListWithErrorBoundary, {
@@ -35,6 +38,9 @@ import ExtensionEditIcon from '../UI/CustomSvgIcons/ExtensionEdit';
 import Tune from '../UI/CustomSvgIcons/Tune';
 import Mark from '../UI/CustomSvgIcons/Mark';
 import newNameGenerator from '../Utils/NewNameGenerator';
+import { ProjectScopedContainersAccessor } from '../InstructionOrExpression/EventsScope.flow';
+import GlobalAndSceneVariablesDialog from '../VariablesList/GlobalAndSceneVariablesDialog';
+
 const gd: libGDevelop = global.gd;
 
 export type ExtensionItemConfigurationAttribute =
@@ -77,6 +83,7 @@ type State = {|
   behaviorMethodSelectorDialogOpen: boolean,
   objectMethodSelectorDialogOpen: boolean,
   extensionFunctionSelectorDialogOpen: boolean,
+  variablesEditorOpen: { global: boolean } | null,
   onAddEventsFunctionCb: ?(
     parameters: ?EventsFunctionCreationParameters
   ) => void,
@@ -112,11 +119,12 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
     behaviorMethodSelectorDialogOpen: false,
     objectMethodSelectorDialogOpen: false,
     extensionFunctionSelectorDialogOpen: false,
+    variablesEditorOpen: null,
     onAddEventsFunctionCb: null,
   };
   editor: ?EventsSheetInterface;
   eventsFunctionList: ?EventsFunctionsListInterface;
-  _editorMosaic: ?EditorMosaic;
+  _editorMosaic: ?EditorMosaicInterface;
   _editorNavigator: ?EditorNavigatorInterface;
   // Create an empty "context" of objects.
   // Avoid recreating containers if they were already created, so that
@@ -124,6 +132,7 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
   // (like ObjectGroupsList) because objects "ptr" changed.
   _globalObjectsContainer: gdObjectsContainer = new gd.ObjectsContainer();
   _objectsContainer: gdObjectsContainer = new gd.ObjectsContainer();
+  _projectScopedContainersAccessor: ProjectScopedContainersAccessor | null = null;
 
   componentDidMount() {
     if (this.props.initiallyFocusedFunctionName) {
@@ -150,37 +159,28 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
     eventsBasedObject: ?gdEventsBasedObject,
     eventsFunctionsExtension: ?gdEventsFunctionsExtension
   ) => {
-    // Initialize this "context" of objects with the function
-    // (as done during code generation).
-    if (eventsBasedBehavior) {
-      gd.EventsFunctionTools.behaviorEventsFunctionToObjectsContainer(
-        project,
-        eventsBasedBehavior,
-        eventsFunction,
-        this._globalObjectsContainer,
-        this._objectsContainer
-      );
-    } else if (eventsBasedObject) {
-      gd.EventsFunctionTools.objectEventsFunctionToObjectsContainer(
-        project,
-        eventsBasedObject,
-        eventsFunction,
-        this._globalObjectsContainer,
-        this._objectsContainer
-      );
-    } else if (eventsFunctionsExtension) {
-      gd.EventsFunctionTools.freeEventsFunctionToObjectsContainer(
-        project,
-        eventsFunctionsExtension,
-        eventsFunction,
-        this._globalObjectsContainer,
-        this._objectsContainer
-      );
-    } else {
+    if (
+      !eventsFunctionsExtension &&
+      !eventsBasedBehavior &&
+      !eventsBasedObject
+    ) {
       throw new Error(
         'No extension, behavior or object was specified when loading a function'
       );
     }
+    const scope = {
+      project,
+      layout: null,
+      externalEvents: null,
+      eventsFunctionsExtension,
+      eventsBasedBehavior,
+      eventsBasedObject,
+      eventsFunction,
+    };
+    this._projectScopedContainersAccessor = new ProjectScopedContainersAccessor(
+      scope,
+      this._objectsContainer
+    );
   };
 
   updateToolbar = () => {
@@ -900,6 +900,14 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
     });
   };
 
+  _editVariables = (
+    options: { global: boolean } | null = { global: false }
+  ) => {
+    this.setState({
+      variablesEditorOpen: options,
+    });
+  };
+
   _editBehavior = (editedEventsBasedBehavior: ?gdEventsBasedBehavior) => {
     this.setState(
       state => {
@@ -1106,6 +1114,7 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
 
   render() {
     const { project, eventsFunctionsExtension } = this.props;
+
     const {
       selectedEventsFunction,
       selectedEventsBasedBehavior,
@@ -1114,7 +1123,18 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
       behaviorMethodSelectorDialogOpen,
       objectMethodSelectorDialogOpen,
       extensionFunctionSelectorDialogOpen,
+      variablesEditorOpen,
     } = this.state;
+
+    const scope = {
+      project,
+      layout: null,
+      externalEvents: null,
+      eventsFunctionsExtension,
+      eventsBasedBehavior: selectedEventsBasedBehavior,
+      eventsBasedObject: selectedEventsBasedObject,
+      eventsFunction: selectedEventsFunction,
+    };
 
     const selectedEventsBasedEntity =
       selectedEventsBasedBehavior || selectedEventsBasedObject;
@@ -1191,6 +1211,7 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
         noTitleBar:
           !!selectedEventsFunction ||
           (!selectedEventsBasedBehavior && !selectedEventsBasedObject),
+        noSoftKeyboardAvoidance: true,
         title: selectedEventsBasedBehavior
           ? t`Behavior Configuration`
           : selectedEventsBasedObject
@@ -1199,6 +1220,7 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
         toolbarControls: [],
         renderEditor: () =>
           selectedEventsFunction &&
+          this._projectScopedContainersAccessor &&
           this._globalObjectsContainer &&
           this._objectsContainer ? (
             <Background>
@@ -1206,17 +1228,12 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
                 key={selectedEventsFunction.ptr}
                 ref={editor => (this.editor = editor)}
                 project={project}
-                scope={{
-                  project,
-                  layout: null,
-                  externalEvents: null,
-                  eventsFunctionsExtension,
-                  eventsBasedBehavior: selectedEventsBasedBehavior,
-                  eventsBasedObject: selectedEventsBasedObject,
-                  eventsFunction: selectedEventsFunction,
-                }}
+                scope={scope}
                 globalObjectsContainer={this._globalObjectsContainer}
                 objectsContainer={this._objectsContainer}
+                projectScopedContainersAccessor={
+                  this._projectScopedContainersAccessor
+                }
                 events={selectedEventsFunction.getEvents()}
                 onOpenExternalEvents={() => {}}
                 onOpenLayout={() => {}}
@@ -1342,6 +1359,11 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
                   i18n
                 )}
                 onEventsBasedObjectRenamed={this._onEventsBasedObjectRenamed}
+                onSelectExtensionProperties={() => this._editOptions(true)}
+                onSelectExtensionGlobalVariables={() =>
+                  this._editVariables({ global })
+                }
+                onSelectExtensionSceneVariables={() => this._editVariables()}
               />
             )}
           </I18n>
@@ -1419,9 +1441,28 @@ export default class EventsFunctionsExtensionEditor extends React.Component<
         </ResponsiveWindowMeasurer>
         {editOptionsDialogOpen && (
           <OptionsEditorDialog
+            project={project}
             eventsFunctionsExtension={eventsFunctionsExtension}
             open
             onClose={() => this._editOptions(false)}
+          />
+        )}
+        {variablesEditorOpen && project && (
+          <GlobalAndSceneVariablesDialog
+            isGlobalTabInitiallyOpen={variablesEditorOpen.global}
+            globalVariables={eventsFunctionsExtension.getGlobalVariables()}
+            sceneVariables={eventsFunctionsExtension.getSceneVariables()}
+            project={project}
+            projectScopedContainersAccessor={
+              new ProjectScopedContainersAccessor({
+                project,
+                eventsFunctionsExtension,
+              })
+            }
+            open
+            onCancel={() => this._editVariables(null)}
+            onApply={() => this._editVariables(null)}
+            preventRefactoringToDeleteInstructions
           />
         )}
         {objectMethodSelectorDialogOpen && selectedEventsBasedObject && (

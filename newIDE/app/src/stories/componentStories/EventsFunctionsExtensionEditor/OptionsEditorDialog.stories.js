@@ -7,14 +7,12 @@ import { action } from '@storybook/addon-actions';
 // Keep first as it creates the `global.gd` object:
 import { testProject } from '../../GDevelopJsInitializerDecorator';
 
-import muiDecorator from '../../ThemeDecorator';
 import OptionsEditorDialog from '../../../EventsFunctionsExtensionEditor/OptionsEditorDialog';
 import EventsFunctionsExtensionsProvider from '../../../EventsFunctionsExtensionsLoader/EventsFunctionsExtensionsProvider';
 
 export default {
   title: 'EventsFunctionsExtensionEditor/OptionsEditorDialog',
   component: OptionsEditorDialog,
-  decorators: [muiDecorator],
 };
 
 export const Default = () => (
@@ -27,6 +25,7 @@ export const Default = () => (
         eventsFunctionsExtensionOpener={null}
       >
         <OptionsEditorDialog
+          project={testProject.project}
           eventsFunctionsExtension={testProject.testEventsFunctionsExtension}
           open
           onClose={action('close')}

@@ -7,6 +7,15 @@ import { type EventsScope } from '../InstructionOrExpression/EventsScope.flow';
 import { setupInstructionParameters } from '../InstructionOrExpression/SetupInstructionParameters';
 import { getObjectParameterIndex } from '../InstructionOrExpression/EnumerateInstructions';
 import { type ParameterFieldInterface } from './ParameterFields/ParameterFieldCommons';
+import Drawer from '@material-ui/core/Drawer';
+import { Column, Line } from '../UI/Grid';
+import { isNativeMobileApp } from '../Utils/Platform';
+import {
+  getAvoidSoftKeyboardStyle,
+  useSoftKeyboardBottomOffset,
+} from '../UI/MobileSoftKeyboard';
+import { ProjectScopedContainersAccessor } from '../InstructionOrExpression/EventsScope.flow';
+
 const gd: libGDevelop = global.gd;
 
 type Props = {|
@@ -14,6 +23,7 @@ type Props = {|
   scope: EventsScope,
   globalObjectsContainer: gdObjectsContainer,
   objectsContainer: gdObjectsContainer,
+  projectScopedContainersAccessor: ProjectScopedContainersAccessor,
 
   open: boolean,
   onRequestClose: () => void,
@@ -34,6 +44,7 @@ const InlineParameterEditor = ({
   scope,
   globalObjectsContainer,
   objectsContainer,
+  projectScopedContainersAccessor,
   open,
   onRequestClose,
   onApply,
@@ -54,6 +65,8 @@ const InlineParameterEditor = ({
   ] = React.useState<?gdInstructionMetadata>(null);
   const [ParameterComponent, setParameterComponent] = React.useState(null);
   const field = React.useRef<?ParameterFieldInterface>(null);
+
+  const softKeyboardBottomOffset = useSoftKeyboardBottomOffset();
 
   const unload = () => {
     setParameterMetadata(null);
@@ -146,32 +159,60 @@ const InlineParameterEditor = ({
   )
     return null;
 
+  const parameterComponent = (
+    <ParameterComponent
+      instruction={instruction}
+      instructionMetadata={instructionMetadata}
+      parameterMetadata={parameterMetadata}
+      parameterIndex={parameterIndex}
+      value={instruction.getParameter(parameterIndex).getPlainString()}
+      onChange={onChange}
+      onRequestClose={onRequestClose}
+      onApply={onParameterEdited}
+      project={project}
+      scope={scope}
+      globalObjectsContainer={globalObjectsContainer}
+      objectsContainer={objectsContainer}
+      projectScopedContainersAccessor={projectScopedContainersAccessor}
+      key={instruction.ptr}
+      ref={field}
+      parameterRenderingService={ParameterRenderingService}
+      isInline
+      resourceManagementProps={resourceManagementProps}
+    />
+  );
+
+  if (isNativeMobileApp()) {
+    return (
+      <Drawer
+        anchor={'bottom'}
+        open={true}
+        onClose={onApply}
+        transitionDuration={0}
+        PaperProps={{
+          style: {
+            ...getAvoidSoftKeyboardStyle(softKeyboardBottomOffset),
+            paddingBottom: 40,
+            maxWidth: 600,
+            margin: 'auto',
+          },
+        }}
+      >
+        <Column>
+          <Line>{parameterComponent}</Line>
+        </Column>
+      </Drawer>
+    );
+  }
+
   return (
     <InlinePopover
-      open={open}
+      open={true}
       anchorEl={anchorEl}
       onRequestClose={onRequestClose}
       onApply={onParameterEdited}
     >
-      <ParameterComponent
-        instruction={instruction}
-        instructionMetadata={instructionMetadata}
-        parameterMetadata={parameterMetadata}
-        parameterIndex={parameterIndex}
-        value={instruction.getParameter(parameterIndex).getPlainString()}
-        onChange={onChange}
-        onRequestClose={onRequestClose}
-        onApply={onParameterEdited}
-        project={project}
-        scope={scope}
-        globalObjectsContainer={globalObjectsContainer}
-        objectsContainer={objectsContainer}
-        key={instruction.ptr}
-        ref={field}
-        parameterRenderingService={ParameterRenderingService}
-        isInline
-        resourceManagementProps={resourceManagementProps}
-      />
+      {parameterComponent}
     </InlinePopover>
   );
 };

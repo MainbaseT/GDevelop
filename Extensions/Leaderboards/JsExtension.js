@@ -1,4 +1,5 @@
-// @flow
+//@ts-check
+/// <reference path="../JsExtensionTypes.d.ts" />
 /**
  * This is a declaration of an extension for GDevelop 5.
  *
@@ -12,18 +13,9 @@
  * More information on https://github.com/4ian/GDevelop/blob/master/newIDE/README-extensions.md
  */
 
-/*::
-// Import types to allow Flow to do static type checking on this file.
-// Extensions declaration are typed using Flow (like the editor), but the files
-// for the game engine are checked with TypeScript annotations.
-import { type ObjectsRenderingService, type ObjectsEditorService } from '../JsExtensionTypes.flow.js'
-*/
-
+/** @type {ExtensionModule} */
 module.exports = {
-  createExtension: function (
-    _ /*: (string) => string */,
-    gd /*: libGDevelop */
-  ) {
+  createExtension: function (_, gd) {
     const extension = new gd.PlatformExtension();
     extension
       .setExtensionInformation(
@@ -42,7 +34,9 @@ module.exports = {
       .addAction(
         'SavePlayerScore',
         _('Save player score'),
-        _("Save the player's score to the given leaderboard."),
+        _(
+          "Save the player's score to the given leaderboard. If the player is connected, the score will be attached to the connected player (unless disabled)."
+        ),
         _(
           'Send to leaderboard _PARAM1_ the score _PARAM2_ with player name: _PARAM3_'
         ),
@@ -68,6 +62,12 @@ module.exports = {
       .getCodeExtraInformation()
       .setIncludeFile('Extensions/Leaderboards/sha256.js')
       .addIncludeFile('Extensions/Leaderboards/leaderboardstools.js')
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationcomponents.js'
+      )
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationtools.js'
+      )
       .setFunctionName('gdjs.evtTools.leaderboards.savePlayerScore')
       .setAsyncFunctionName('gdjs.evtTools.leaderboards.savePlayerScore');
 
@@ -95,8 +95,37 @@ module.exports = {
       .getCodeExtraInformation()
       .setIncludeFile('Extensions/Leaderboards/sha256.js')
       .addIncludeFile('Extensions/Leaderboards/leaderboardstools.js')
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationcomponents.js'
+      )
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationtools.js'
+      )
       .setFunctionName('gdjs.evtTools.leaderboards.saveConnectedPlayerScore')
-      .setAsyncFunctionName('gdjs.evtTools.leaderboards.saveConnectedPlayerScore');
+      .setAsyncFunctionName(
+        'gdjs.evtTools.leaderboards.saveConnectedPlayerScore'
+      );
+
+    extension
+      .addAction(
+        'SetPreferSendConnectedPlayerScore',
+        _('Always attach scores to the connected player'),
+        _(
+          'Set if the score sent to a leaderboard is always attached to the connected player - if any. This is on by default.'
+        ),
+        _('Always attach the score to the connected player: _PARAM1_'),
+        _('Setup'),
+        'JsPlatform/Extensions/leaderboard.svg',
+        'JsPlatform/Extensions/leaderboard.svg'
+      )
+      .addCodeOnlyParameter('currentScene', '')
+      .addParameter('yesorno', _('Enable?'), '', false)
+      .setHelpPath('/all-features/leaderboards')
+      .getCodeExtraInformation()
+      .setIncludeFile('Extensions/Leaderboards/leaderboardstools.js')
+      .setFunctionName(
+        'gdjs.evtTools.leaderboards.setPreferSendConnectedPlayerScore'
+      );
 
     extension
       .addCondition(
@@ -279,6 +308,12 @@ module.exports = {
       .setHelpPath('/all-features/leaderboards')
       .getCodeExtraInformation()
       .setIncludeFile('Extensions/Leaderboards/leaderboardstools.js')
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationcomponents.js'
+      )
+      .addIncludeFile(
+        'Extensions/PlayerAuthentication/playerauthenticationtools.js'
+      )
       .setFunctionName('gdjs.evtTools.leaderboards.displayLeaderboard');
 
     extension
@@ -299,10 +334,7 @@ module.exports = {
 
     return extension;
   },
-  runExtensionSanityTests: function (
-    gd /*: libGDevelop */,
-    extension /*: gdPlatformExtension*/
-  ) {
+  runExtensionSanityTests: function (gd, extension) {
     return [];
   },
 };

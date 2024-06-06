@@ -8,8 +8,11 @@ import {
 } from '../Utils/GDevelopServices/Usage';
 import {
   getUserBadges,
+  listDefaultRecommendations,
   listRecommendations,
+  type CommunityLinks,
 } from '../Utils/GDevelopServices/User';
+import { getAchievements } from '../Utils/GDevelopServices/Badge';
 import Authentication, {
   type LoginForm,
   type RegisterForm,
@@ -57,6 +60,7 @@ import { extractGDevelopApiErrorStatusAndCode } from '../Utils/GDevelopServices/
 import { showErrorBox } from '../UI/Messages/MessageBox';
 import { userCancellationErrorName } from '../LoginProvider/Utils';
 import { listUserPurchases } from '../Utils/GDevelopServices/Shop';
+import { listNotifications } from '../Utils/GDevelopServices/Notification';
 
 type Props = {|
   authentication: Authentication,
@@ -93,6 +97,7 @@ const cleanUserTracesOnDevice = async () => {
 };
 
 const TEN_SECONDS = 10 * 1000;
+const ONE_MINUTE = 6 * TEN_SECONDS;
 
 export default class AuthenticatedUserProvider extends React.Component<
   Props,
@@ -122,6 +127,7 @@ export default class AuthenticatedUserProvider extends React.Component<
   _automaticallyUpdateUserProfile = true;
   _hasNotifiedUserAboutEmailVerification = false;
   _abortController: ?AbortController = null;
+  _notificationPollingIntervalId: ?IntervalID = null;
 
   // Cloud projects are requested in 2 different places at app opening.
   // - First one comes from user authenticating and automatically fetching
@@ -187,6 +193,7 @@ export default class AuthenticatedUserProvider extends React.Component<
 
   // This should be called only on the first mount of the provider.
   _initializeAuthenticatedUser() {
+    this._fetchAchievements();
     this.setState(({ authenticatedUser }) => ({
       authenticatedUser: {
         ...initialAuthenticatedUser,
@@ -211,6 +218,7 @@ export default class AuthenticatedUserProvider extends React.Component<
         onRefreshLimits: this._fetchUserLimits,
         onRefreshGameTemplatePurchases: this._fetchUserGameTemplatePurchases,
         onRefreshAssetPackPurchases: this._fetchUserAssetPackPurchases,
+        onRefreshNotifications: this._fetchUserNotifications,
         onPurchaseSuccessful: this._fetchUserProducts,
         onSendEmailVerification: this._doSendEmailVerification,
         onOpenEmailVerificationDialog: ({
@@ -238,6 +246,10 @@ export default class AuthenticatedUserProvider extends React.Component<
   // - When the user logs out.
   // - When the user deletes their account.
   _markAuthenticatedUserAsLoggedOut() {
+    if (this._notificationPollingIntervalId) {
+      clearInterval(this._notificationPollingIntervalId);
+      this._notificationPollingIntervalId = null;
+    }
     this.setState(({ authenticatedUser }) => ({
       authenticatedUser: {
         ...authenticatedUser,
@@ -245,6 +257,19 @@ export default class AuthenticatedUserProvider extends React.Component<
       },
     }));
     this._hasNotifiedUserAboutEmailVerification = false;
+
+    listDefaultRecommendations().then(
+      recommendations =>
+        this.setState(({ authenticatedUser }) => ({
+          authenticatedUser: {
+            ...authenticatedUser,
+            recommendations,
+          },
+        })),
+      error => {
+        console.error('Error while loading default recommendations:', error);
+      }
+    );
   }
 
   _reloadFirebaseProfile = async (): Promise<?FirebaseUser> => {
@@ -253,6 +278,10 @@ export default class AuthenticatedUserProvider extends React.Component<
     try {
       const firebaseUser = await authentication.getFirebaseUser();
       if (!firebaseUser) {
+        if (this._notificationPollingIntervalId) {
+          clearInterval(this._notificationPollingIntervalId);
+          this._notificationPollingIntervalId = null;
+        }
         this.setState(({ authenticatedUser }) => ({
           authenticatedUser: {
             ...authenticatedUser,
@@ -489,6 +518,8 @@ export default class AuthenticatedUserProvider extends React.Component<
       }
     );
     this._fetchUserBadges();
+    this._fetchAchievements();
+    this._fetchUserNotifications();
 
     // Load and wait for the user profile to be fetched.
     // (and let the error propagate if any).
@@ -507,6 +538,15 @@ export default class AuthenticatedUserProvider extends React.Component<
         // Catch the error so that the user profile is still fetched.
         console.error('Error while updating the user profile:', error);
       }
+    }
+
+    if (!this._notificationPollingIntervalId) {
+      this._notificationPollingIntervalId = setInterval(() => {
+        // This property is correctly updated by Electron, browsers and capacitor.
+        if (document.visibilityState === 'visible') {
+          this._fetchUserNotifications();
+        }
+      }, 10 * ONE_MINUTE);
     }
 
     this.setState(
@@ -544,6 +584,28 @@ export default class AuthenticatedUserProvider extends React.Component<
       }));
     } catch (error) {
       console.error('Error while loading user subscriptions:', error);
+    }
+  };
+
+  _fetchUserNotifications = async () => {
+    const { authentication } = this.props;
+    const firebaseUser = this.state.authenticatedUser.firebaseUser;
+    if (!firebaseUser) return;
+
+    try {
+      const notifications = await listNotifications(
+        authentication.getAuthorizationHeader,
+        { userId: firebaseUser.uid }
+      );
+
+      this.setState(({ authenticatedUser }) => ({
+        authenticatedUser: {
+          ...authenticatedUser,
+          notifications,
+        },
+      }));
+    } catch (error) {
+      console.error('Error while loading user notifications:', error);
     }
   };
 
@@ -787,6 +849,23 @@ export default class AuthenticatedUserProvider extends React.Component<
     }
   };
 
+  _fetchAchievements = async () => {
+    // Load achievements only once, as they are the same across all users.
+    if (this.state.authenticatedUser.achievements) return;
+
+    try {
+      const achievements = await getAchievements();
+      this.setState(({ authenticatedUser }) => ({
+        authenticatedUser: {
+          ...authenticatedUser,
+          achievements,
+        },
+      }));
+    } catch (error) {
+      console.error('Error while loading achievements:', error);
+    }
+  };
+
   _notifyUserAboutEmailVerification = () => {
     const { profile, firebaseUser } = this.state.authenticatedUser;
     if (!profile) return;
@@ -933,8 +1012,7 @@ export default class AuthenticatedUserProvider extends React.Component<
 
   _doEdit = async (
     payload: PatchUserPayload,
-    preferences: PreferencesValues,
-    { throwError }: {| throwError: boolean |}
+    preferences: PreferencesValues
   ) => {
     const { authentication } = this.props;
     if (!authentication) return;
@@ -955,17 +1033,16 @@ export default class AuthenticatedUserProvider extends React.Component<
           appLanguage: preferences.language,
           donateLink: payload.donateLink,
           discordUsername: payload.discordUsername,
+          githubUsername: payload.githubUsername,
           communityLinks: payload.communityLinks,
           survey: payload.survey,
         }
       );
       await this._fetchUserProfileWithoutThrowingErrors();
-      this.openEditProfileDialog(false);
     } catch (apiCallError) {
       this.setState({ apiCallError });
-      if (throwError) {
-        throw apiCallError;
-      }
+
+      throw apiCallError;
     } finally {
       this.setState({
         editInProgress: false,
@@ -1201,6 +1278,96 @@ export default class AuthenticatedUserProvider extends React.Component<
     });
   };
 
+  _onUpdateGithubStar = async (
+    githubUsername: string,
+    preferences: PreferencesValues
+  ) => {
+    const { authentication } = this.props;
+
+    await this._doEdit(
+      {
+        githubUsername,
+      },
+      preferences
+    );
+
+    this.setState({
+      editInProgress: true,
+    });
+    try {
+      const response = await authentication.updateGitHubStar(
+        authentication.getAuthorizationHeader
+      );
+      this._fetchUserBadges();
+
+      return response;
+    } finally {
+      this.setState({
+        editInProgress: false,
+      });
+    }
+  };
+
+  _onUpdateTiktokFollow = async (
+    communityLinks: CommunityLinks,
+    preferences: PreferencesValues
+  ) => {
+    const { authentication } = this.props;
+
+    await this._doEdit(
+      {
+        communityLinks,
+      },
+      preferences
+    );
+
+    this.setState({
+      editInProgress: true,
+    });
+    try {
+      const response = await authentication.updateTiktokFollow(
+        authentication.getAuthorizationHeader
+      );
+      this._fetchUserBadges();
+
+      return response;
+    } finally {
+      this.setState({
+        editInProgress: false,
+      });
+    }
+  };
+
+  _onUpdateTwitterFollow = async (
+    communityLinks: CommunityLinks,
+    preferences: PreferencesValues
+  ) => {
+    const { authentication } = this.props;
+
+    await this._doEdit(
+      {
+        communityLinks,
+      },
+      preferences
+    );
+
+    this.setState({
+      editInProgress: true,
+    });
+    try {
+      const response = await authentication.updateTwitterFollow(
+        authentication.getAuthorizationHeader
+      );
+      this._fetchUserBadges();
+
+      return response;
+    } finally {
+      this.setState({
+        editInProgress: false,
+      });
+    }
+  };
+
   render() {
     return (
       <PreferencesContext.Consumer>
@@ -1230,10 +1397,26 @@ export default class AuthenticatedUserProvider extends React.Component<
               this.state.editProfileDialogOpen && (
                 <EditProfileDialog
                   profile={this.state.authenticatedUser.profile}
+                  achievements={this.state.authenticatedUser.achievements}
+                  badges={this.state.authenticatedUser.badges}
                   subscription={this.state.authenticatedUser.subscription}
                   onClose={() => this.openEditProfileDialog(false)}
-                  onEdit={form =>
-                    this._doEdit(form, preferences, { throwError: false })
+                  onEdit={async form => {
+                    try {
+                      await this._doEdit(form, preferences);
+                      this.openEditProfileDialog(false);
+                    } catch (error) {
+                      // Ignore errors, we will let the user retry in their profile.
+                    }
+                  }}
+                  onUpdateGitHubStar={githubUsername =>
+                    this._onUpdateGithubStar(githubUsername, preferences)
+                  }
+                  onUpdateTiktokFollow={communityLinks =>
+                    this._onUpdateTiktokFollow(communityLinks, preferences)
+                  }
+                  onUpdateTwitterFollow={communityLinks =>
+                    this._onUpdateTwitterFollow(communityLinks, preferences)
                   }
                   onDelete={this._doDeleteAccount}
                   actionInProgress={

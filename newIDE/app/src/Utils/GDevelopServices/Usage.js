@@ -13,6 +13,10 @@ export type Usage = {
 };
 export type Usages = Array<Usage>;
 
+export type CancelReasons = {
+  [key: string]: boolean | string,
+};
+
 export type Subscription = {|
   userId: string,
   planId: string | null,
@@ -34,6 +38,7 @@ export type Subscription = {|
   paypalPayerId?: string,
 
   cancelAtPeriodEnd?: boolean,
+  cancelReasons?: CancelReasons,
 
   purchaselyPlan?: string,
 
@@ -64,13 +69,24 @@ export type Capabilities = {|
     canMaximumCountPerGameBeIncreased: boolean,
     themeCustomizationCapabilities: 'NONE' | 'BASIC' | 'FULL',
     canUseCustomCss: boolean,
+    canDisableLoginInLeaderboard: boolean,
+  },
+  privateTutorials?: {
+    allowedIdPrefixes: Array<string>,
+  },
+  classrooms?: {
+    hidePlayTab: boolean,
+    hideUpgradeNotice: boolean,
+    showClassroomTab: boolean,
   },
 |};
 
+export type UsagePrice = {|
+  priceInCredits: number,
+|};
+
 export type UsagePrices = {|
-  [key: string]: {|
-    priceInCredits: number,
-  |},
+  [key: string]: UsagePrice,
 |};
 
 export type UsagePurchasableQuantities = {|
@@ -132,7 +148,7 @@ export type SubscriptionPlanPricingSystem = {|
   period: 'week' | 'month' | 'year',
   isPerUser?: true,
   currency: 'EUR' | 'USD',
-  region: 'north' | 'south' | 'everywhere',
+  region: string,
   amountInCents: number,
   periodCount: number,
 |};
@@ -143,6 +159,21 @@ export type SubscriptionPlan = {|
   nameByLocale: MessageByLocale,
   descriptionByLocale: MessageByLocale,
   bulletPointsByLocale: Array<MessageByLocale>,
+  specificRequirementByLocale?: MessageByLocale,
+  targetAudiences: Array<'CASUAL' | 'PRO' | 'EDUCATION'>,
+  fullFeatures: Array<{|
+    featureName: string,
+    pillarName: string,
+    descriptionByLocale?: MessageByLocale,
+    tooltipByLocale?: MessageByLocale,
+    enabled?: 'yes' | 'no',
+    unlimited?: true,
+    upcoming?: true,
+    trialLike?: true,
+  |}>,
+
+  pillarNamesPerLocale: { [key: string]: MessageByLocale },
+  featureNamesByLocale: { [key: string]: MessageByLocale },
 |};
 
 export type SubscriptionPlanWithPricingSystems = {|
@@ -267,7 +298,7 @@ export const changeUserSubscription = async (
   getAuthorizationHeader: () => Promise<string>,
   userId: string,
   newSubscriptionDetails: {| planId: string | null |},
-  options: {| cancelImmediately: boolean |}
+  options: {| cancelImmediately: boolean, cancelReasons: CancelReasons |}
 ): Promise<Subscription> => {
   const authorizationHeader = await getAuthorizationHeader();
 
@@ -277,6 +308,7 @@ export const changeUserSubscription = async (
       ...newSubscriptionDetails,
       prohibitSeamlessUpdate: true,
       cancelImmediately: options.cancelImmediately,
+      cancelReasons: options.cancelReasons,
     },
     {
       params: {
@@ -302,14 +334,6 @@ export const canSeamlesslyChangeSubscription = (
   return false;
 };
 
-export const canCancelAtEndOfPeriod = (subscription: Subscription) => {
-  // If the subscription is on Stripe, it can be set as cancelled and only removed at the
-  // end of the period already paid.
-  // Otherwise (Paypal), it will be cancelled immediately.
-  // TODO: When the backend allows it, remove this payment provider condition.
-  return !!subscription.stripeSubscriptionId;
-};
-
 export const hasMobileAppStoreSubscriptionPlan = (
   subscription: ?Subscription
 ): boolean => {
@@ -319,11 +343,7 @@ export const hasMobileAppStoreSubscriptionPlan = (
 export const hasSubscriptionBeenManuallyAdded = (
   subscription: ?Subscription
 ): boolean => {
-  return (
-    !!subscription &&
-    (subscription.stripeSubscriptionId === 'MANUALLY_ADDED' ||
-      subscription.stripeCustomerId === 'MANUALLY_ADDED')
-  );
+  return !!subscription && subscription.pricingSystemId === 'MANUALLY_ADDED';
 };
 
 export const hasValidSubscriptionPlan = (subscription: ?Subscription) => {
@@ -407,9 +427,7 @@ export const canUseCloudProjectHistory = (
 ): boolean => {
   if (!subscription) return false;
   return (
-    ['gdevelop_business', 'gdevelop_startup', 'gdevelop_education'].includes(
-      subscription.planId
-    ) ||
+    ['gdevelop_startup', 'gdevelop_education'].includes(subscription.planId) ||
     (subscription.planId === 'gdevelop_gold' &&
       !!subscription.benefitsFromEducationPlan)
   );
@@ -447,3 +465,16 @@ export const canBenefitFromDiscordRole = (subscription: ?Subscription) => {
     !subscription.benefitsFromEducationPlan
   );
 };
+
+export const canUpgradeSubscription = (subscription: ?Subscription) => {
+  return (
+    !!subscription &&
+    !['gdevelop_education', 'gdevelop_startup'].includes(subscription.planId) &&
+    !subscription.benefitsFromEducationPlan
+  );
+};
+
+export const canUseClassroomFeature = (limits: ?Limits) =>
+  limits &&
+  limits.capabilities.classrooms &&
+  limits.capabilities.classrooms.showClassroomTab;

@@ -252,6 +252,7 @@ type Props = {|
   // Or it can display arbitrary content, like the list of assets in a pack, or similar assets,
   // then currentPage is null.
   currentPage?: AssetStorePageState,
+  hideGameTemplates?: boolean,
 |};
 
 const AssetsList = React.forwardRef<Props, AssetsListInterface>(
@@ -270,6 +271,7 @@ const AssetsList = React.forwardRef<Props, AssetsListInterface>(
       onGoBackToFolderIndex,
       noScroll,
       currentPage,
+      hideGameTemplates,
     }: Props,
     ref
   ) => {
@@ -600,7 +602,8 @@ const AssetsList = React.forwardRef<Props, AssetsListInterface>(
           // Don't show private game templates if filtering on assets.
           hasAssetFiltersApplied ||
           // Don't show private game templates if filtering on asset packs.
-          hasAssetPackFiltersApplied
+          hasAssetPackFiltersApplied ||
+          hideGameTemplates
         )
           return [];
 
@@ -628,6 +631,7 @@ const AssetsList = React.forwardRef<Props, AssetsListInterface>(
         receivedGameTemplates,
         hasAssetFiltersApplied,
         hasAssetPackFiltersApplied,
+        hideGameTemplates,
       ]
     );
 
@@ -966,6 +970,7 @@ const AssetsList = React.forwardRef<Props, AssetsListInterface>(
             !isAssetPackAudioOnly(openedAssetPack)) &&
           noResultComponent}
         {onPrivateAssetPackSelection &&
+          onPrivateGameTemplateSelection &&
           openAuthorPublicProfileDialog &&
           authorPublicProfile && (
             <PublicProfileDialog
@@ -973,6 +978,11 @@ const AssetsList = React.forwardRef<Props, AssetsListInterface>(
               onClose={() => setOpenAuthorPublicProfileDialog(false)}
               onAssetPackOpen={assetPackListingData => {
                 onPrivateAssetPackSelection(assetPackListingData);
+                setOpenAuthorPublicProfileDialog(false);
+                setAuthorPublicProfile(null);
+              }}
+              onGameTemplateOpen={gameTemplateListingData => {
+                onPrivateGameTemplateSelection(gameTemplateListingData);
                 setOpenAuthorPublicProfileDialog(false);
                 setAuthorPublicProfile(null);
               }}

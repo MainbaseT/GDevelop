@@ -66,6 +66,7 @@ export type Leaderboard = {|
   extremeAllowedScore?: number,
   ignoreCustomPlayerNames?: boolean,
   autoPlayerNamePrefix?: string,
+  disableLoginInLeaderboard?: string,
 |};
 
 export type LeaderboardUpdatePayload = {|
@@ -78,6 +79,7 @@ export type LeaderboardUpdatePayload = {|
   extremeAllowedScore?: number | null,
   ignoreCustomPlayerNames?: boolean,
   autoPlayerNamePrefix?: string,
+  disableLoginInLeaderboard?: boolean,
 |};
 
 export type LeaderboardEntry = {|
@@ -319,6 +321,9 @@ export type Comment = {
   createdAt: number,
   processedAt?: number,
   updatedAt: number,
+  qualityRatingPerRole?: {
+    owner?: string,
+  },
 };
 
 export const listComments = async (
@@ -347,6 +352,12 @@ export const listComments = async (
     .then(response => response.data);
 };
 
+export const canCommentBeRatedByOwner = (comment: Comment): boolean => {
+  if (!comment.text) return false;
+
+  return true;
+};
+
 export const updateComment = async (
   getAuthorizationHeader: () => Promise<string>,
   userId: string,
@@ -354,17 +365,19 @@ export const updateComment = async (
     gameId,
     commentId,
     processed,
+    qualityRating,
   }: {|
     gameId: string,
     commentId: string,
-    processed: boolean,
+    processed?: boolean,
+    qualityRating?: string,
   |}
 ) => {
   return getAuthorizationHeader()
     .then(authorizationHeader =>
       axios.patch(
         `${GDevelopPlayApi.baseUrl}/game/${gameId}/comment/${commentId}`,
-        { processed },
+        { processed, qualityRating },
         {
           params: { userId },
           headers: {

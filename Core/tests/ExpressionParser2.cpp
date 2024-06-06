@@ -11,7 +11,7 @@
 #include "GDCore/IDE/Events/ExpressionValidator.h"
 #include "GDCore/IDE/Events/ExpressionTypeFinder.h"
 #include "GDCore/IDE/Events/ExpressionVariableOwnerFinder.h"
-#include "GDCore/IDE/Events/ExpressionVariableParentFinder.h"
+#include "GDCore/IDE/Events/ExpressionVariablePathFinder.h"
 #include "GDCore/Project/Layout.h"
 #include "GDCore/Project/Project.h"
 #include "GDCore/Project/ProjectScopedContainers.h"
@@ -22,6 +22,8 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
   gd::Project project;
   gd::Platform platform;
   SetupProjectWithDummyPlatform(project, platform);
+  project.GetVariables().InsertNew("MyProjectVariable");
+
   auto &layout1 = project.InsertNewLayout("Layout1", 0);
   layout1.GetVariables().InsertNew("MySceneVariable");
   layout1.GetVariables().InsertNew("MySceneVariable2");
@@ -204,7 +206,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(node != nullptr);
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -232,7 +234,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(node != nullptr);
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -786,7 +788,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(node != nullptr);
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -1525,7 +1527,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
           parser.ParseExpression("MyNonExistingSceneVariable");
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -1557,7 +1559,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
           parser.ParseExpression("MyNonExistingSceneVariable.MyNonExistingChild");
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -1641,7 +1643,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
           parser.ParseExpression("MyNonExistingSpriteObject.MyVariable");
 
       // Also check that if we try to find the last parent of node, it is not defined.
-      auto lastParentOfNode = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfNode = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, *node);
       REQUIRE(lastParentOfNode.parentVariable == nullptr);
       REQUIRE(lastParentOfNode.parentVariablesContainer == nullptr);
@@ -2711,6 +2713,103 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
               "You entered a text, but this type was expected: variable");
     }
   }
+  
+  SECTION("Variable declaration") {
+    SECTION("Undeclared variable") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() ==
+              "No variable with this name found.");
+    }
+
+    SECTION("Undeclared variable with children") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable.MyChild.MyChild");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() ==
+              "No variable with this name found.");
+    }
+
+    SECTION("Declared scene variable") {
+      auto node = parser.ParseExpression("MySceneVariable");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Declared scene variable with children") {
+      // Children themselves don't need to be declared.
+      auto node = parser.ParseExpression("MySceneVariable.MyChild.MyChild");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Declared project variable") {
+      auto node = parser.ParseExpression("MyProjectVariable");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Declared project variable with children") {
+      auto node = parser.ParseExpression("MyProjectVariable.MyChild.MyChild");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "variable");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Undeclared legacy pre-scope scene variable") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "scenevar");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Undeclared legacy pre-scope scene variable with children") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable.MyChild.MyChild");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "scenevar");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Undeclared legacy pre-scope project variable") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "globalvar");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+
+    SECTION("Undeclared legacy pre-scope project variable with children") {
+      auto node = parser.ParseExpression("MyUndeclaredVariable.MyChild.MyChild");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "globalvar");
+      node->Visit(validator);
+      REQUIRE(validator.GetFatalErrors().size() == 0);
+    }
+  }
 
   SECTION("Valid variables") {
     SECTION("simple variable") {
@@ -2954,6 +3053,238 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
     }
   }
 
+  SECTION("Valid operators with variables having different types than the expression") {
+    SECTION("Expression/parent type is 'string'") {
+      // A trivial test (everything is a string).
+      {
+        auto node = parser.ParseExpression("\"You have \" + MySceneStringVariable + \" points\"");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+        node->Visit(validator);
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A string concatenated with a number variable (will have to be casted to a string in code generation)
+      {
+        auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A string concatenated with a number variable (will have to be casted to a string in code generation)
+      // and then with a string again.
+      {
+        auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable + \" points\"");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A string concatenated with an unknown variable (will have to be casted to a string in code generation)
+      // and then with a string again.
+      {
+        auto node = parser.ParseExpression("\"You have \" + MySceneStructureVariable.MyChild.CantKnownTheTypeSoStayGeneric + \" points\"");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+    }
+    SECTION("Expression/parent type is 'number'") {
+      // A trivial test (everything is a string).
+      {
+        auto node = parser.ParseExpression("123 + MySceneNumberVariable + 456");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "number");
+        node->Visit(validator);
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A number concatenated with a string variable (will have to be casted to a number in code generation)
+      {
+        auto node = parser.ParseExpression("123 + MySceneStringVariable");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "number");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A number concatenated with a string variable (will have to be casted to a number in code generation)
+      // and then with a number again.
+      {
+        auto node = parser.ParseExpression("123 + MySceneStringVariable + 456");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "number");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+      // A number concatenated with an unknown variable (will have to be casted to a number in code generation)
+      // and then with a number again.
+      {
+        auto node = parser.ParseExpression("123 + MySceneStructureVariable.MyChild.CantKnownTheTypeSoStayGeneric + 456");
+        REQUIRE(node != nullptr);
+
+        gd::ExpressionValidator validator(platform, projectScopedContainers, "number");
+        node->Visit(validator);
+
+        REQUIRE(validator.GetFatalErrors().size() == 0);
+      }
+    }
+    SECTION("Expression/parent type is 'number|string'") {
+      SECTION("Expression/parent inferred type is 'string'") {
+        // A trivial test (everything is a string).
+        {
+          auto node = parser.ParseExpression("\"You have \" + MySceneStringVariable + \" points\"");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A string concatenated with a number variable (will have to be casted to a string in code generation)
+        {
+          auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A string concatenated with a number variable (will have to be casted to a string in code generation)
+        // and then with a string again.
+        {
+          auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable + \" points\"");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A string concatenated with an unknown variable (will have to be casted to a string in code generation)
+        // and then with a string again.
+        {
+          auto node = parser.ParseExpression("\"You have \" + MySceneStructureVariable.MyChild.CantKnownTheTypeSoStayGeneric + \" points\"");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+      }
+      SECTION("Expression/parent inferred type is 'number'") {
+        // A trivial test (everything is a string).
+        {
+          auto node = parser.ParseExpression("123 + MySceneNumberVariable + 456");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A number concatenated with a string variable (will have to be casted to a number in code generation)
+        {
+          auto node = parser.ParseExpression("123 + MySceneStringVariable");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A number concatenated with a string variable (will have to be casted to a number in code generation)
+        // and then with a number again.
+        {
+          auto node = parser.ParseExpression("123 + MySceneStringVariable + 456");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+        // A number concatenated with an unknown variable (will have to be casted to a number in code generation)
+        // and then with a number again.
+        {
+          auto node = parser.ParseExpression("123 + MySceneStructureVariable.MyChild.CantKnownTheTypeSoStayGeneric + 456");
+          REQUIRE(node != nullptr);
+
+          gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+          node->Visit(validator);
+
+          REQUIRE(validator.GetFatalErrors().size() == 0);
+        }
+      }
+    }
+  }
+
+  SECTION("Invalid operators with variables having different types than the expression") {
+    // Try to do a sum between numbers in a string expression
+    {
+      auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable + 2 + \" points\"");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+      node->Visit(validator);
+
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() == "You entered a number, but a text was expected (in quotes).");
+      REQUIRE(validator.GetFatalErrors()[0]->GetStartPosition() == 38);
+      REQUIRE(validator.GetFatalErrors()[0]->GetEndPosition() == 39);
+    }
+    // Try to do a sum between numbers in a number|string expression (that is inferred as a string with the first operand)
+    {
+      auto node = parser.ParseExpression("\"You have \" + MySceneNumberVariable + 2 + \" points\"");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "string");
+      node->Visit(validator);
+
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() == "You entered a number, but a text was expected (in quotes).");
+      REQUIRE(validator.GetFatalErrors()[0]->GetStartPosition() == 38);
+      REQUIRE(validator.GetFatalErrors()[0]->GetEndPosition() == 39);
+    }
+    // Try to do a string concatenation in a number expression
+    {
+      auto node = parser.ParseExpression("123 + MySceneStringVariable + \"hello\" + 456");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "number");
+      node->Visit(validator);
+
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() == "You entered a text, but a number was expected.");
+      REQUIRE(validator.GetFatalErrors()[0]->GetStartPosition() == 30);
+      REQUIRE(validator.GetFatalErrors()[0]->GetEndPosition() == 37);
+    }
+    // Try to do a string concatenation in a number|string expression (that is inferred as a number with the first operand)
+    {
+      auto node = parser.ParseExpression("123 + MySceneStringVariable + \"hello\" + 456");
+      REQUIRE(node != nullptr);
+
+      gd::ExpressionValidator validator(platform, projectScopedContainers, "number|string");
+      node->Visit(validator);
+
+      REQUIRE(validator.GetFatalErrors().size() == 1);
+      REQUIRE(validator.GetFatalErrors()[0]->GetMessage() == "You entered a text, but a number was expected.");
+      REQUIRE(validator.GetFatalErrors()[0]->GetStartPosition() == 30);
+      REQUIRE(validator.GetFatalErrors()[0]->GetEndPosition() == 37);
+    }
+  }
+
   SECTION("Valid function call with object variable") {
     {
       // Note that in this test we need to use an expression with "objectvar",
@@ -2986,10 +3317,10 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(variable2ObjectName == "MySpriteObject2");
 
       // Also check the ability to find the last parent of the variables:
-      auto lastParentOfVariable1Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable1Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable1Node);
       REQUIRE(lastParentOfVariable1Node.parentVariablesContainer == &mySpriteObject.GetVariables());
-      auto lastParentOfVariable2Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable2Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable2Node);
       REQUIRE(lastParentOfVariable2Node.parentVariablesContainer == &mySpriteObject2.GetVariables());
 
@@ -3025,10 +3356,10 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(variable2ObjectName == "MySpriteObject");
 
       // Also check the ability to find the last parent of the variables:
-      auto lastParentOfVariable1Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable1Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable1Node);
       REQUIRE(lastParentOfVariable1Node.parentVariablesContainer == &mySpriteObject.GetVariables());
-      auto lastParentOfVariable2Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable2Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable2Node);
       REQUIRE(lastParentOfVariable2Node.parentVariablesContainer == &mySpriteObject.GetVariables());
 
@@ -3054,7 +3385,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(variable1ObjectName == "MySpriteObject");
 
       // Also check the ability to find the last parent of the variable:
-      auto lastParentOfVariable1Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable1Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable1Node);
       REQUIRE(lastParentOfVariable1Node.parentVariablesContainer == &mySpriteObject.GetVariables());
 
@@ -3081,7 +3412,7 @@ TEST_CASE("ExpressionParser2", "[common][events]") {
       REQUIRE(variable1ObjectName == "MySpriteObject");
 
       // Also check the ability to find the last parent of the variable:
-      auto lastParentOfVariable1Node = gd::ExpressionVariableParentFinder::GetLastParentOfNode(
+      auto lastParentOfVariable1Node = gd::ExpressionVariablePathFinder::GetLastParentOfNode(
           platform, projectScopedContainers, variable1Node);
       REQUIRE(lastParentOfVariable1Node.parentVariable == &mySpriteObject.GetVariables().Get("MyVariable"));
 

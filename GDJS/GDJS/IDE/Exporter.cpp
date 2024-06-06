@@ -12,6 +12,7 @@
 #include <string>
 
 #include "GDCore/CommonTools.h"
+#include "GDCore/Events/CodeGeneration/DiagnosticReport.h"
 #include "GDCore/IDE/AbstractFileSystem.h"
 #include "GDCore/IDE/Events/UsedExtensionsFinder.h"
 #include "GDCore/IDE/Project/ProjectResourcesCopier.h"
@@ -64,6 +65,10 @@ bool Exporter::ExportWholePixiProject(const ExportOptions &options) {
                         &options,
                         &helper,
                         &usedExtensionsResult](gd::String exportDir) {
+    gd::WholeProjectDiagnosticReport &wholeProjectDiagnosticReport =
+        options.project.GetWholeProjectDiagnosticReport();
+    wholeProjectDiagnosticReport.Clear();
+
     // Use project properties fallback to set empty properties
     if (exportedProject.GetAuthorIds().empty() &&
         !options.fallbackAuthorId.empty()) {
@@ -114,8 +119,8 @@ bool Exporter::ExportWholePixiProject(const ExportOptions &options) {
     helper.ExportEffectIncludes(exportedProject, includesFiles);
 
     // Export events
-    if (!helper.ExportEventsCode(
-            exportedProject, codeOutputDir, includesFiles, false)) {
+    if (!helper.ExportEventsCode(exportedProject, codeOutputDir, includesFiles,
+                                 wholeProjectDiagnosticReport, false)) {
       gd::LogError(_("Error during exporting! Unable to export events:\n") +
                    lastError);
       return false;
@@ -151,11 +156,6 @@ bool Exporter::ExportWholePixiProject(const ExportOptions &options) {
                              noRuntimeGameOptions, projectUsedResources,
                              scenesUsedResources);
     includesFiles.push_back(codeOutputDir + "/data.js");
-
-    // Export a WebManifest with project metadata
-    if (!fs.WriteToFile(exportDir + "/manifest.webmanifest",
-                        helper.GenerateWebManifest(exportedProject)))
-      gd::LogError("Unable to export WebManifest.");
 
     helper.ExportIncludesAndLibs(includesFiles, exportDir, false);
     helper.ExportIncludesAndLibs(resourcesFiles, exportDir, false);
@@ -204,6 +204,9 @@ bool Exporter::ExportWholePixiProject(const ExportOptions &options) {
       return false;
   } else {
     if (!exportProject(options.exportPath)) return false;
+
+    if (!helper.ExportHtml5Files(exportedProject, options.exportPath))
+      return false;
   }
 
   return true;
